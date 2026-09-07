@@ -56,15 +56,25 @@ void main() {
       const MethodChannel('PonnamKarthik/fluttertoast'), (_) async => true);
     final servers = <HttpServer>[];
     final requests = <Map<String, dynamic>>[];
-    final logStarted = Completer<void>(), releaseLog = Completer<void>();
+    late Completer<void> logStarted, releaseLog;
     addTearDown(() async {
       if (!releaseLog.isCompleted) releaseLog.complete();
       for (final server in servers) { await server.close(force: true); }
       await getIt.reset();
     });
     Future<T> real<T>(Future<T> Function() work) => HttpOverrides.runWithHttpOverrides(work, LoopbackHttp());
-    Future<T?> io<T>(Future<T> Function() work) => tester.runAsync(
-      () => real(() => work().timeout(const Duration(seconds: 20))));
+    Future<T?> io<T>(Future<T> Function() work) async {
+      final result = await tester.runAsync(
+        () => real(() => work().timeout(const Duration(seconds: 20))));
+      final error = tester.takeException();
+      if (error != null) throw error;
+      return result;
+    }
+    // These signals belong to real I/O, outside the widget test's paused clock.
+    await io(() async {
+      logStarted = Completer<void>();
+      releaseLog = Completer<void>();
+    });
     Future<String> server(String panel) async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       servers.add(server);
@@ -172,8 +182,10 @@ void main() {
       await logStarted.future;
     });
     expect(await io(() => login.loginTwice(panelContext, '123456')), LoginHelper.success);
-    releaseLog.complete();
-    expect((await io(() => lateLog!))!.success, isFalse);
+    expect((await io(() async {
+      releaseLog.complete();
+      return await lateLog!;
+    }))!.success, isFalse);
     expect(oldHttp.isClosed, isTrue);
     expect(user.host, b);
     expect(user.token, 'synthetic-b');
