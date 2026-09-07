@@ -1,0 +1,84 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'LICENSE']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'LICENSE']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '11'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.3.10'
+          channel: stable
+          cache: true
+      - name: Resolve locked dependencies
+        run: |
+          flutter config --no-analytics
+          flutter pub get
+          git diff --exit-code -- pubspec.lock
+      - name: Test HTTP response handling
+        run: flutter test test/http_test.dart
+      - name: Restore signing key
+        if: github.event_name != 'pull_request'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE" && test -n "$STORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD"
+          umask 077
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/qinglong.jks"
+      - name: Build signed APK
+        if: github.event_name != 'pull_request'
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/qinglong.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: flutter build apk --release --build-name=3.0.1 --build-number=${{ github.run_number }}
+      - name: Build PR debug APK
+        if: github.event_name == 'pull_request'
+        run: flutter build apk --debug
+      - name: Verify APK and prepare download
+        if: github.event_name != 'pull_request'
+        run: |
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          mkdir -p artifacts
+          cp "$APK" artifacts/qinglong-android.apk
+          cd artifacts
+          sha256sum qinglong-android.apk > SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: qinglong-android-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/qinglong.jks"
