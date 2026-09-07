@@ -18,14 +18,16 @@ class LoginHelper {
   final String password;
   final String? alias;
   final bool rememberPassword;
+  final bool useSecretLogin;
 
   LoginHelper(
     this.host,
     this.userName,
     this.password,
     this.rememberPassword,
-    this.alias,
-  );
+    this.alias, {
+    this.useSecretLogin = false,
+  });
 
   Future<int> login(BuildContext context) async {
     SingleAccountPageState.ofHttp(context)?.clear();
@@ -90,7 +92,7 @@ class LoginHelper {
         SingleAccountPageState.of(context)?.index ?? 0,
         host,
         response.bean?.token ?? "",
-        false,
+        useSecretLogin,
         alias);
     if (rememberPassword) {
       SingleAccountPageState.ofUserInfo(context)
@@ -102,6 +104,6 @@ class LoginHelper {
   }
 
   bool loginByUserName() {
-    return true;
+    return !useSecretLogin;
   }
 }

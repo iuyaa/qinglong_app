@@ -38,8 +38,8 @@ jobs:
           flutter config --no-analytics
           flutter pub get
           git diff --exit-code -- pubspec.lock
-      - name: Test HTTP response handling
-        run: flutter test test/http_test.dart
+      - name: Test API compatibility
+        run: flutter test
       - name: Restore signing key
         if: github.event_name != 'pull_request'
         env:
@@ -58,7 +58,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: flutter build apk --release --build-name=3.0.1 --build-number=${{ github.run_number }}
+        run: flutter build apk --release --build-name=3.0.2 --build-number=${{ github.run_number }}
       - name: Build PR debug APK
         if: github.event_name == 'pull_request'
         run: flutter build apk --debug

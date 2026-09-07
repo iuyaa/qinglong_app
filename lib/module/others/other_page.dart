@@ -723,6 +723,10 @@ class OtherPageState extends ConsumerState<OtherPage>
                               "应用设置",
                               CupertinoIcons.gear_alt,
                               () {
+                                if (SingleAccountPageState.ofUserInfo(context).useSecretLogined) {
+                                  "请使用账号密码登录后管理应用".toast();
+                                  return;
+                                }
                                 Navigator.of(context).push(CupertinoPageRoute(
                                     builder: (context) => const AppKeyPage()));
                               },
@@ -733,6 +737,10 @@ class OtherPageState extends ConsumerState<OtherPage>
                               "通知设置",
                               CupertinoIcons.envelope,
                               () {
+                                if (SingleAccountPageState.ofUserInfo(context).useSecretLogined) {
+                                  "请使用账号密码登录后管理通知".toast();
+                                  return;
+                                }
                                 Navigator.of(context).push(CupertinoPageRoute(
                                     builder: (context) =>
                                         const PushSettingPage()));

@@ -143,7 +143,6 @@ class Http {
 
   HttpResponse<T> exceptionHandler<T>(DioError e, String path) {
     try {
-      logger.e(e);
       if (e.response?.statusCode == 401 && !Url.inWhiteList(path)) {
         if (!getIt<UserInfoViewModel>(instanceName: index.toString()).useSecretLogined) {
           exitLogin();
@@ -151,13 +150,17 @@ class Http {
         return HttpResponse(success: false, message: "没有该模块的访问权限", code: 401);
       }
 
-      if (e.response != null && e.response!.data != null) {
-        return HttpResponse(success: false, message: e.response?.data["message"] ?? e.message, code: e.response?.data["code"] ?? 0);
-      } else {
-        return HttpResponse(success: false, message: e.message, code: e.response?.statusCode ?? 0);
-      }
+      final data = e.response?.data;
+      final status = e.response?.statusCode ?? 0;
+      return HttpResponse(
+        success: false,
+        message: data is Map && data['message'] is String
+            ? data['message']
+            : (status == 0 ? '网络连接失败，请检查地址和证书' : '请求失败（HTTP $status）'),
+        code: data is Map && data['code'] is int ? data['code'] : status,
+      );
     } catch (e) {
-      return HttpResponse(success: false, message: e.toString(), code: 400);
+      return HttpResponse(success: false, message: '请求处理失败', code: 400);
     }
   }
 
@@ -218,7 +221,6 @@ class Http {
           );
         }
       } catch (e) {
-        logger.e(e);
         return HttpResponse<T>(
           success: false,
           code: -1000,

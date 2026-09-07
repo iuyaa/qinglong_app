@@ -17,7 +17,6 @@ import 'package:qinglong_app/utils/extension.dart';
 import 'package:qinglong_app/utils/login_helper.dart';
 import 'package:qinglong_app/utils/sp_utils.dart';
 import 'package:qinglong_app/utils/utils.dart';
-import 'package:flip_card/flip_card.dart';
 
 import '../others/change_account_page.dart';
 
@@ -40,7 +39,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _cIdController = TextEditingController();
   final TextEditingController _cSecretController = TextEditingController();
-  GlobalKey<FlipCardState> cardKey = GlobalKey<FlipCardState>();
+  bool _useSecretLogin = false;
 
   bool rememberPassword = false;
 
@@ -48,6 +47,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   void initState() {
     super.initState();
     if (!widget.fromAddNewAccount) {
+      _useSecretLogin = SingleAccountPageState.ofUserInfo(context).useSecretLogined;
       _hostController.text = SingleAccountPageState.ofUserInfo(context).host ?? "";
       if (SingleAccountPageState.ofUserInfo(context).userName != null &&
           SingleAccountPageState.ofUserInfo(context).userName!.isNotEmpty) {
@@ -152,7 +152,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               child: Align(
                                 alignment: Alignment.centerLeft,
                                 child: Text(
-                                  "账号登录",
+                                  _useSecretLogin ? "应用登录" : "账号登录",
                                   style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.bold,
@@ -185,6 +185,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       SizedBox(
                         height: MediaQuery.of(context).size.height / 15,
                       ),
+                      CupertinoSlidingSegmentedControl<bool>(
+                        groupValue: _useSecretLogin,
+                        children: const {
+                          false: Text('账号密码'),
+                          true: Text('应用密钥'),
+                        },
+                        onValueChanged: (value) {
+                          if (value != null && !isLoading) {
+                            setState(() => _useSecretLogin = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
                       Row(
                         children: [
                           const SizedBox(
@@ -235,9 +248,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         children: [
                           Row(
                             children: [
-                              const SizedBox(
+                              SizedBox(
                                 child: Text(
-                                  "账户",
+                                  _useSecretLogin ? "ID" : "账户",
                                   style: TextStyle(
                                     fontSize: 16,
                                   ),
@@ -252,14 +265,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   onChanged: (_) {
                                     setState(() {});
                                   },
-                                  controller: _userNameController,
+                                  controller: _useSecretLogin ? _cIdController : _userNameController,
                                   decoration: InputDecoration(
                                     border: InputBorder.none,
                                     enabledBorder: InputBorder.none,
                                     focusedBorder: InputBorder.none,
                                     isDense: true,
                                     contentPadding: const EdgeInsets.all(4),
-                                    hintText: "请输入账户",
+                                    hintText: _useSecretLogin ? "Client ID" : "请输入账户",
                                     hintStyle: TextStyle(
                                       fontSize: 16,
                                       color: ref.watch(themeProvider).themeColor.hintColor(),
@@ -278,10 +291,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ),
                           Row(
                             children: [
-                              const SizedBox(
+                              SizedBox(
                                 width: 40,
                                 child: Text(
-                                  "密码",
+                                  _useSecretLogin ? "密钥" : "密码",
                                   style: TextStyle(
                                     fontSize: 16,
                                   ),
@@ -295,7 +308,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   onChanged: (_) {
                                     setState(() {});
                                   },
-                                  controller: _passwordController,
+                                  controller: _useSecretLogin ? _cSecretController : _passwordController,
                                   obscureText: true,
                                   decoration: InputDecoration(
                                     border: InputBorder.none,
@@ -303,7 +316,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     focusedBorder: InputBorder.none,
                                     isDense: true,
                                     contentPadding: const EdgeInsets.all(4),
-                                    hintText: "请输入密码",
+                                    hintText: _useSecretLogin ? "Client Secret" : "请输入密码",
                                     hintStyle: TextStyle(
                                       fontSize: 16,
                                       color: ref.watch(themeProvider).themeColor.hintColor(),
@@ -527,7 +540,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool isLoading = false;
 
   bool loginByUserName() {
-    return true;
+    return !_useSecretLogin;
   }
 
   LoginHelper? helper;
@@ -542,6 +555,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       password,
       rememberPassword,
       _aliasController.text,
+      useSecretLogin: _useSecretLogin,
     );
     var response = await helper!.login(context);
     dealLoginResponse(response);
@@ -669,22 +683,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   void selected(UserInfoBean result) {
     _hostController.text = result.host ?? "";
+    _useSecretLogin = result.useSecretLogined;
     if (result.useSecretLogined) {
       _cIdController.text = result.userName ?? "";
       _cSecretController.text = result.password ?? "";
-      if (cardKey.currentState?.isFront ?? false) {
-        WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-          cardKey.currentState?.toggleCard();
-        });
-      }
     } else {
       _userNameController.text = result.userName ?? "";
       _passwordController.text = result.password ?? "";
-      if (!(cardKey.currentState?.isFront ?? false)) {
-        WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-          cardKey.currentState?.toggleCard();
-        });
-      }
     }
     _aliasController.text = result.alias ?? "";
     rememberPassword = true;

@@ -640,7 +640,8 @@ class HomePageState extends ConsumerState<HomePage> {
                   await EasyLoading.show(status: " 登录中");
 
                   LoginHelper loginHelper = LoginHelper(
-                      userInfo.host!, userInfo.userName!, userInfo.password!, true, userInfo.alias);
+                      userInfo.host!, userInfo.userName!, userInfo.password!, true, userInfo.alias,
+                      useSecretLogin: userInfo.useSecretLogined);
                   var response = await loginHelper.login(context);
 
                   EasyLoading.dismiss();

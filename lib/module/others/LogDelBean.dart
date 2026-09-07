@@ -21,7 +21,7 @@ class LogDelBean {
   });
 
   LogDelBean.fromJson(Map<String, dynamic> json) {
-    frequency = json['frequency'];
+    frequency = json['logRemoveFrequency'] ?? json['frequency'];
     id = json['id'];
     type = json['type'];
     info = json['info'] != null ? new Info.fromJson(json['info']) : null;
@@ -56,7 +56,7 @@ class Info {
   Info({this.frequency});
 
   Info.fromJson(Map<String, dynamic> json) {
-    frequency = json['frequency'];
+    frequency = json['logRemoveFrequency'] ?? json['frequency'];
   }
 
   Map<String, dynamic> toJson() {

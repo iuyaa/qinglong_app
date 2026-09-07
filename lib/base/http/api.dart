@@ -15,6 +15,7 @@ import 'package:qinglong_app/module/others/update/check_update_bean.dart';
 import 'package:qinglong_app/module/task/task_bean.dart';
 
 import '../../module/task/TaskBean2.dart';
+import '../userinfo_viewmodel.dart';
 import '../ui/tree/models/script_data.dart';
 
 class Api {
@@ -23,16 +24,23 @@ class Api {
   Api(this.index);
 
   Future<HttpResponse<LogDelBean>> logDel() async {
+    final urls = getIt<Url>(instanceName: index.toString());
+    final version = getIt<SystemBean>(instanceName: index.toString());
     return await getIt<Http>(instanceName: index.toString()).get<LogDelBean>(
-      getIt<Url>(instanceName: index.toString()).logDel,
+      version.isAtLeast(2, 15, 17) ? urls.systemConfig : urls.logDel,
       {},
     );
   }
 
   Future<HttpResponse<String>> logDelTime(int time) async {
+    final urls = getIt<Url>(instanceName: index.toString());
+    final version = getIt<SystemBean>(instanceName: index.toString());
+    final modern = version.isAtLeast(2, 15, 17);
     return await getIt<Http>(instanceName: index.toString()).put<String>(
-      getIt<Url>(instanceName: index.toString()).logDel,
-      {"frequency": time},
+      modern
+          ? urls.systemConfig + (version.isAtLeast(2, 17, 0) ? '/log-remove-frequency' : '')
+          : urls.logDel,
+      {modern ? "logRemoveFrequency" : "frequency": time},
     );
   }
 
@@ -98,6 +106,9 @@ class Api {
   }
 
   Future<HttpResponse<UserBean>> user() async {
+    if (getIt<UserInfoViewModel>(instanceName: index.toString()).useSecretLogined) {
+      return HttpResponse(success: false, code: 403, message: '应用密钥无法读取账号信息');
+    }
     return await getIt<Http>(instanceName: index.toString()).get<UserBean>(
       Url.user,
       null,
@@ -107,7 +118,7 @@ class Api {
   Future<HttpResponse<TaskBean2>> crons2_13_09() async {
     return await getIt<Http>(instanceName: index.toString()).get<TaskBean2>(
       getIt<Url>(instanceName: index.toString()).tasks,
-      {"page": "1", "size": "10000", "searchText": ""},
+      {"searchValue": ""},
     );
   }
 
@@ -416,8 +427,8 @@ class Api {
   Future<HttpResponse<String>> taskLogDetail(String name, String path) async {
     if (getIt<SystemBean>(instanceName: index.toString()).isUpperVersion2_13_0()) {
       return await getIt<Http>(instanceName: index.toString()).get<String>(
-        getIt<Url>(instanceName: index.toString()).taskLogDetail + name + "?path=" + path,
-        null,
+        getIt<Url>(instanceName: index.toString()).taskLogDetail + Uri.encodeComponent(name),
+        {"path": path},
       );
     } else {
       return await getIt<Http>(instanceName: index.toString()).get<String>(

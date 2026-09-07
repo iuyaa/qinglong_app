@@ -28,5 +28,14 @@ void main() {
     final malformed = Http.decodeResponse<String>(
         response('<html>not JSON</html>'), 'data', false);
     expect(malformed.success, isFalse);
+
+    final http = Http('http://127.0.0.1', 0);
+    final badGateway = http.exceptionHandler<String>(DioError(
+      requestOptions: RequestOptions(path: '/open/auth/token'),
+      response: response('<html>proxy failure</html>', status: 502),
+      type: DioErrorType.response,
+    ), '/open/auth/token');
+    expect(badGateway.code, 502);
+    expect(badGateway.message, '请求失败（HTTP 502）');
   });
 }

@@ -20,6 +20,8 @@ class Url {
 
   get logDel => getIt<UserInfoViewModel>(instanceName: index.toString()).useSecretLogined ? "/open/system/log/remove" : "/api/system/log/remove";
 
+  get systemConfig => getIt<UserInfoViewModel>(instanceName: index.toString()).useSecretLogined ? "/open/system/config" : "/api/system/config";
+
   get tasks => getIt<UserInfoViewModel>(instanceName: index.toString()).useSecretLogined ? "/open/crons" : "/api/crons";
 
   get subscribes => getIt<UserInfoViewModel>(instanceName: index.toString()).useSecretLogined ? "/open/subscriptions" : "/api/subscriptions";
@@ -134,7 +136,7 @@ class Url {
   }
 
   static bool inLoginList(String path) {
-    if (path == login || path == loginByClientId || path == loginOld) {
+    if (path == login || path == loginByClientId || path == loginTwo || path == loginOld) {
       return true;
     }
     return false;
