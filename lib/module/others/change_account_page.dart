@@ -230,7 +230,8 @@ class _ChangeAccountPageState extends ConsumerState<ChangeAccountPage> {
                         ),
                         onPressed: () {
                           Navigator.of(childContext).pop();
-                          getIt<MultiAccountUserInfoViewModel>().removeHistoryAccount(model.host);
+                          getIt<MultiAccountUserInfoViewModel>().removeHistoryAccount(UserInfoBean(
+                            host: model.host, userName: model.userName, useSecretLogined: model.useSecretLogined));
                           getIt<UserInfoViewModel>(instanceName: index.toString())
                               .clearCurrentInfo(index);
                           setState(() {});

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:qinglong_app/base/userinfo_viewmodel.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -738,8 +739,10 @@ class _SettingPageState extends ConsumerState<SettingPage> {
   }
 
   void clearData(BuildContext context) {
+    final model = SingleAccountPageState.ofUserInfo(context);
     getIt<MultiAccountUserInfoViewModel>()
-        .removeHistoryAccount(SingleAccountPageState.ofUserInfo(context).host);
+        .removeHistoryAccount(UserInfoBean(host: model.host, userName: model.userName,
+          useSecretLogined: model.useSecretLogined));
     SingleAccountPageState.ofUserInfo(context)
         .clearCurrentInfo(SingleAccountPageState.of(context)?.index ?? 0);
   }
