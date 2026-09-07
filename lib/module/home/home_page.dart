@@ -25,6 +25,7 @@ import 'package:qinglong_app/utils/utils.dart';
 
 import '../../base/multi_account_userinfo_viewmodel.dart';
 import '../../base/userinfo_viewmodel.dart';
+import '../login/login_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -44,7 +45,7 @@ class HomePageState extends ConsumerState<HomePage> {
     SingleAccountPageState.of(context)
         ?.registerHttp(SingleAccountPageState.ofUserInfo(context).host!);
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-      getSystemBean(context);
+      if (mounted) getSystemBean(context);
     });
   }
 
@@ -76,13 +77,17 @@ class HomePageState extends ConsumerState<HomePage> {
   bool getSystemBeanSuccess = false;
 
   void updateSystemBean() {
+    if (!mounted) return;
     setState(() {
       getSystemBeanSuccess = true;
     });
   }
 
   void getSystemBean(BuildContext context) async {
+    final http = SingleAccountPageState.ofHttp(context);
     var bean = await SingleAccountPageState.ofApi(context).system();
+    if (!mounted || http?.isClosed == true ||
+        !identical(http, SingleAccountPageState.ofHttp(context))) return;
 
     if (!bean.success) {
       String? host = SingleAccountPageState.ofUserInfo(context).host;
@@ -198,6 +203,7 @@ class HomePageState extends ConsumerState<HomePage> {
 
   @override
   void dispose() {
+    _switchHelper?.cancel();
     MultiAccountPageState.clearAction();
     super.dispose();
   }
@@ -634,20 +640,7 @@ class HomePageState extends ConsumerState<HomePage> {
               onTap: () {
                 dismissMask();
 
-                if (SingleAccountPageState.ofHttp(context)?.host == userInfo.host) return;
-
-                WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
-                  await EasyLoading.show(status: " 登录中");
-
-                  LoginHelper loginHelper = LoginHelper(
-                      userInfo.host!, userInfo.userName!, userInfo.password!, true, userInfo.alias,
-                      useSecretLogin: userInfo.useSecretLogined);
-                  var response = await loginHelper.login(context);
-
-                  EasyLoading.dismiss();
-
-                  dealLoginResponse(loginHelper, response);
-                });
+                switchAccount(userInfo);
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -679,71 +672,40 @@ class HomePageState extends ConsumerState<HomePage> {
     });
   }
 
-  void twoFact(LoginHelper helper) {
-    String twoFact = "";
-    showCupertinoDialog(
-        useRootNavigator: false,
-        context: context,
-        builder: (_) => CupertinoAlertDialog(
-              title: const Text("两步验证"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Material(
-                    color: Colors.transparent,
-                    child: TextField(
-                      onChanged: (value) {
-                        twoFact = value;
-                      },
-                      maxLines: 1,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.fromLTRB(0, 5, 0, 5),
-                        hintText: "请输入code",
-                      ),
-                      autofocus: true,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                CupertinoDialogAction(
-                  child: const Text(
-                    "取消",
-                    style: TextStyle(
-                      color: Color(0xff999999),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-                CupertinoDialogAction(
-                  child: Text(
-                    "确定",
-                    style: TextStyle(
-                      color: ref.watch(themeProvider).primaryColor,
-                    ),
-                  ),
-                  onPressed: () async {
-                    Navigator.of(context).pop(true);
-                    var response = await helper.loginTwice(context, twoFact);
-                    dealLoginResponse(helper, response);
-                  },
-                ),
-              ],
-            )).then((value) {});
-  }
+  LoginHelper? _switchHelper;
+  bool _switching = false;
 
-  void dealLoginResponse(LoginHelper hepler, int response) {
-    if (response == LoginHelper.success) {
-      Navigator.of(context).pushReplacementNamed(Routes.routeHomePage);
-    } else if (response == LoginHelper.failed) {
-      EasyLoading.showError("登录失败，请检查账号");
-    } else {
-      twoFact(hepler);
+  Future<void> switchAccount(UserInfoBean account) async {
+    if (_switching || !mounted) return;
+    final current = SingleAccountPageState.ofUserInfo(context);
+    if (current.isLogined() && current.host == account.host &&
+        current.userName == account.userName && current.useSecretLogined == account.useSecretLogined) return;
+    if ((account.userName?.isEmpty ?? true) || (account.password?.isEmpty ?? true)) {
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => LoginPage(initialAccount: account)));
+      return;
+    }
+    _switching = true;
+    _switchHelper?.cancel();
+    final helper = LoginHelper(account.host ?? '', account.userName!, account.password!,
+        true, account.alias, useSecretLogin: account.useSecretLogined);
+    _switchHelper = helper;
+    try {
+      await EasyLoading.show(status: '登录中');
+      var result = await helper.login(context);
+      EasyLoading.dismiss();
+      if (!mounted) return;
+      if (result == LoginHelper.twiceLogin) result = await helper.completeTwoFactor(context);
+      if (!mounted) return;
+      if (result == LoginHelper.success) {
+        Navigator.of(context).pushNamedAndRemoveUntil(Routes.routeHomePage, (_) => false);
+      }
+    } finally {
+      _switching = false;
+      EasyLoading.dismiss();
     }
   }
+
 }
 
 class IndexBean {

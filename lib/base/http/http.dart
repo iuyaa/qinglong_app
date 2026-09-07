@@ -20,114 +20,71 @@ class Http {
   String host;
   int index;
 
-  Http(
-    this.host,
-    this.index,
-  ) {
-    _init();
-  }
+  final bool authenticated;
+  bool _closed = false;
 
-  void initDioConfig(
-    String host,
-  ) {
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: host,
-        connectTimeout: 50000,
-        receiveTimeout: 50000,
-        sendTimeout: 50000,
-        contentType: "application/json",
-      ),
-    );
-
-    _dio?.interceptors.add(TokenInterceptor(
-      host,
-      index,
+  Http(this.host, this.index, {this.authenticated = true}) {
+    _dio = Dio(BaseOptions(
+      baseUrl: host,
+      connectTimeout: 50000,
+      receiveTimeout: 50000,
+      sendTimeout: 50000,
+      contentType: "application/json",
     ));
+    _dio!.interceptors.add(TokenInterceptor(host, index, authenticated: authenticated));
   }
 
-  void _init() {
-    if (_dio == null) {
-      initDioConfig(host);
-    }
+  bool get isClosed => _closed;
+
+  void close() {
+    _closed = true;
+    _dio?.close(force: true);
   }
 
-  void clear() {
-    _dio = null;
-  }
+  Future<HttpResponse<T>> get<T>(String uri, Map<String, String?>? json,
+      {bool compute = true, String serializationName = "data"}) =>
+      _request<T>('GET', uri, json, compute, serializationName);
 
-  Future<HttpResponse<T>> get<T>(
-    String uri,
-    Map<String, String?>? json, {
-    bool compute = true,
-    String serializationName = "data",
-  }) async {
+  Future<HttpResponse<T>> post<T>(String uri, dynamic json,
+      {bool compute = true, String serializationName = "data"}) =>
+      _request<T>('POST', uri, json, compute, serializationName);
+
+  Future<HttpResponse<T>> put<T>(String uri, dynamic json,
+      {bool compute = true, String serializationName = "data"}) =>
+      _request<T>('PUT', uri, json, compute, serializationName);
+
+  Future<HttpResponse<T>> delete<T>(String uri, dynamic json,
+      {bool compute = true, String serializationName = "data"}) =>
+      _request<T>('DELETE', uri, json, compute, serializationName);
+
+  HttpResponse<T> _cancelled<T>() =>
+      HttpResponse(success: false, code: -1001, message: '会话已切换，请求已取消');
+
+  Future<HttpResponse<T>> _request<T>(String method, String uri, dynamic json,
+      bool compute, String serializationName) async {
+    if (_closed) return _cancelled<T>();
     try {
-      _init();
-      var response = await _dio!.get(uri, queryParameters: json);
-      return decodeResponse<T>(response, serializationName, compute);
+      final response = await _dio!.request(uri,
+          options: Options(method: method),
+          queryParameters: method == 'GET' ? json : null,
+          data: method == 'GET' ? null : json);
+      if (_closed) return _cancelled<T>();
+      return _handleAuth(decodeResponse<T>(response, serializationName, compute), uri);
     } on DioError catch (e) {
       return exceptionHandler<T>(e, uri);
     }
   }
 
-  Future<HttpResponse<T>> post<T>(
-    String uri,
-    dynamic json, {
-    bool compute = true,
-    String serializationName = "data",
-  }) async {
-    try {
-      _init();
-      var response = await _dio!.post(uri, data: json);
-
-      return decodeResponse<T>(
-        response,
-        serializationName,
-        compute,
-      );
-    } on DioError catch (e) {
-      return exceptionHandler<T>(e, uri);
+  HttpResponse<T> _handleAuth<T>(HttpResponse<T> response, String path) {
+    if (authenticated && response.code == 401 && !Url.inWhiteList(path)) {
+      // Qinglong sends both expired-token and missing-scope errors as 401.
+      if (['暂无权限', 'Access denied', '没有该模块的访问权限'].contains(response.message?.trim())) {
+        return HttpResponse(success: false, code: 403, message: '没有该模块的访问权限，请检查应用授权');
+      }
+      exitLogin();
+      return HttpResponse(success: false, code: 401, message: '身份已过期，请重新登录');
     }
-  }
-
-  Future<HttpResponse<T>> delete<T>(
-    String uri,
-    dynamic json, {
-    bool compute = true,
-    String serializationName = "data",
-  }) async {
-    try {
-      _init();
-      var response = await _dio!.delete(uri, data: json);
-
-      return decodeResponse<T>(
-        response,
-        serializationName,
-        compute,
-      );
-    } on DioError catch (e) {
-      return exceptionHandler<T>(e, uri);
-    }
-  }
-
-  Future<HttpResponse<T>> put<T>(
-    String uri,
-    dynamic json, {
-    bool compute = true,
-    String serializationName = "data",
-  }) async {
-    try {
-      _init();
-      var response = await _dio!.put(uri, data: json);
-      return decodeResponse<T>(
-        response,
-        serializationName,
-        compute,
-      );
-    } on DioError catch (e) {
-      return exceptionHandler<T>(e, uri);
-    }
+    return response;
   }
 
   void exitLogin() {
@@ -142,23 +99,17 @@ class Http {
   }
 
   HttpResponse<T> exceptionHandler<T>(DioError e, String path) {
+    if (_closed) return _cancelled<T>();
     try {
-      if (e.response?.statusCode == 401 && !Url.inWhiteList(path)) {
-        if (!getIt<UserInfoViewModel>(instanceName: index.toString()).useSecretLogined) {
-          exitLogin();
-        }
-        return HttpResponse(success: false, message: "没有该模块的访问权限", code: 401);
-      }
-
       final data = e.response?.data;
       final status = e.response?.statusCode ?? 0;
-      return HttpResponse(
+      return _handleAuth(HttpResponse<T>(
         success: false,
         message: data is Map && data['message'] is String
             ? data['message']
             : (status == 0 ? '网络连接失败，请检查地址和证书' : '请求失败（HTTP $status）'),
-        code: data is Map && data['code'] is int ? data['code'] : status,
-      );
+        code: status == 401 || status == 403 ? status : (data is Map && data['code'] is int ? data['code'] : status),
+      ), path);
     } catch (e) {
       return HttpResponse(success: false, message: '请求处理失败', code: 400);
     }

@@ -1,6 +1,7 @@
 import 'package:qinglong_app/base/multi_account_userinfo_viewmodel.dart';
 
 import '../main.dart';
+import 'http/http.dart';
 
 class UserInfoViewModel {
   String? _token;
@@ -9,6 +10,15 @@ class UserInfoViewModel {
   String? _userName;
   String? _passWord;
   bool _useSecertLogined = false;
+  int revision = 0;
+  int loginAttempt = 0;
+
+  void _invalidateRequests(int index) {
+    revision++;
+    if (getIt.isRegistered<Http>(instanceName: index.toString())) {
+      getIt<Http>(instanceName: index.toString()).close();
+    }
+  }
 
   UserInfoViewModel(
       {String? token,
@@ -26,6 +36,7 @@ class UserInfoViewModel {
   }
 
   void clearCurrentInfo(int index) {
+    _invalidateRequests(index);
     getIt<MultiAccountUserInfoViewModel>().removeTokenBean(index);
     _host = null;
     _token = null;
@@ -42,6 +53,7 @@ class UserInfoViewModel {
 
   void updateToken(
       int index, String? host, String? token, bool useSecret, String? alias) {
+    _invalidateRequests(index);
     if (host != null) {
       _host = host;
     }
@@ -85,9 +97,6 @@ class UserInfoViewModel {
     return token != null && token!.isNotEmpty;
   }
 
-  void updateHost(String host) {
-    _host = host;
-  }
 }
 
 class UserInfoBean {

@@ -22,10 +22,12 @@ import '../others/change_account_page.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   final bool fromAddNewAccount;
+  final UserInfoBean? initialAccount;
 
   const LoginPage({
     Key? key,
     this.fromAddNewAccount = false,
+    this.initialAccount,
   }) : super(key: key);
 
   @override
@@ -74,6 +76,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         _aliasController.text = SingleAccountPageState.ofUserInfo(context).alias!;
       }
     }
+    if (widget.initialAccount != null) selected(widget.initialAccount!);
   }
 
   GlobalKey<AnimatorWidgetState> loginKey = GlobalKey<AnimatorWidgetState>();
@@ -461,9 +464,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   "域名必须以http://或者https://开头".toast();
                                   return;
                                 }
-                                SingleAccountPageState.of(context)
-                                    ?.registerHttp(_hostController.text);
-                                SingleAccountPageState.ofHttp(context)?.pushedLoginPage = false;
                                 Utils.hideKeyBoard(context);
                                 if (loginByUserName()) {
                                   login(_userNameController.text, _passwordController.text);
@@ -546,6 +546,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   LoginHelper? helper;
 
   Future<void> login(String userName, String password) async {
+    if (isLoading) return;
+    helper?.cancel();
     isLoading = true;
     setState(() {});
 
@@ -558,16 +560,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       useSecretLogin: _useSecretLogin,
     );
     var response = await helper!.login(context);
-    dealLoginResponse(response);
+    if (!mounted) return;
+    if (response == LoginHelper.twiceLogin) {
+      response = await helper!.completeTwoFactor(context);
+    }
+    if (mounted) dealLoginResponse(response);
   }
 
   void dealLoginResponse(int response) {
     if (response == LoginHelper.success) {
-      Navigator.of(context).pushReplacementNamed(Routes.routeHomePage);
-    } else if (response == LoginHelper.failed) {
-      loginFailed();
+      Navigator.of(context).pushNamedAndRemoveUntil(Routes.routeHomePage, (_) => false);
     } else {
-      twoFact();
+      loginFailed();
     }
   }
 
@@ -588,69 +592,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
-  void twoFact() {
-    String twoFact = "";
-    showCupertinoDialog(
-        useRootNavigator: false,
-        context: context,
-        builder: (_) => CupertinoAlertDialog(
-              title: const Text("两步验证"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Material(
-                    color: Colors.transparent,
-                    child: TextField(
-                      onChanged: (value) {
-                        twoFact = value;
-                      },
-                      maxLines: 1,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.fromLTRB(0, 5, 0, 5),
-                        hintText: "请输入code",
-                      ),
-                      autofocus: true,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                CupertinoDialogAction(
-                  child: const Text(
-                    "取消",
-                    style: TextStyle(
-                      color: Color(0xff999999),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-                CupertinoDialogAction(
-                  child: Text(
-                    "确定",
-                    style: TextStyle(
-                      color: ref.watch(themeProvider).primaryColor,
-                    ),
-                  ),
-                  onPressed: () async {
-                    Navigator.of(context).pop(true);
-                    if (helper != null) {
-                      var response = await helper!.loginTwice(context, twoFact);
-                      dealLoginResponse(response);
-                    } else {
-                      "状态异常，请重新点登录按钮".toast();
-                    }
-                  },
-                ),
-              ],
-            )).then((value) {
-      if (value == null) {
-        isLoading = false;
-        setState(() {});
-      }
-    });
+  @override
+  void dispose() {
+    helper?.cancel();
+    for (final controller in [_hostController, _aliasController, _userNameController,
+      _passwordController, _cIdController, _cSecretController]) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   Widget buildCell(BuildContext context, UserInfoBean bean) {
@@ -682,6 +631,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   void selected(UserInfoBean result) {
+    if (isLoading) return;
     _hostController.text = result.host ?? "";
     _useSecretLogin = result.useSecretLogined;
     if (result.useSecretLogined) {

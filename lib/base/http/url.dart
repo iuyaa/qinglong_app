@@ -129,14 +129,14 @@ class Url {
   }
 
   static bool inWhiteList(String path) {
-    if (path == login || path == loginByClientId || path == loginTwo || path == loginOld) {
+    if (path == system || path == login || path == loginByClientId || path == loginTwo || path == loginOld) {
       return true;
     }
     return false;
   }
 
   static bool inLoginList(String path) {
-    if (path == login || path == loginByClientId || path == loginTwo || path == loginOld) {
+    if (path == system || path == login || path == loginByClientId || path == loginTwo || path == loginOld) {
       return true;
     }
     return false;

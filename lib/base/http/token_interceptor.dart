@@ -8,11 +8,13 @@ import '../userinfo_viewmodel.dart';
 class TokenInterceptor extends Interceptor {
   String host;
   int index;
+  final bool authenticated;
 
   TokenInterceptor(
     this.host,
-    this.index,
-  );
+    this.index, {
+    this.authenticated = true,
+  });
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -26,7 +28,7 @@ class TokenInterceptor extends Interceptor {
           (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
     }
 
-    if (!Url.inLoginList(options.path)) {
+    if (authenticated && !Url.inLoginList(options.path)) {
       if (getIt<UserInfoViewModel>(instanceName: index.toString()).token !=
               null &&
           getIt<UserInfoViewModel>(instanceName: index.toString())

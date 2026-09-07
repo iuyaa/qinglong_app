@@ -68,6 +68,14 @@ class SingleAccountPageState extends State<SingleAccountPage> {
     codeSearchProvider = StateProvider.family((ref, _) => "", name: getProviderName(context));
   }
 
+  void resetProviders() {
+    final container = ProviderScope.containerOf(context, listen: false);
+    for (final provider in [configProvider, dependencyProvider, envProvider,
+      taskProvider, subscribeProvider, appKeyProvider, homeIndexProvider, codeSearchProvider]) {
+      container.invalidate(provider);
+    }
+  }
+
   static StateProviderFamily<String, String?> ofCodeSearchProvider(BuildContext context) {
     return context.findAncestorStateOfType<SingleAccountPageState>()!.codeSearchProvider;
   }
@@ -202,6 +210,7 @@ class SingleAccountPageState extends State<SingleAccountPage> {
 
   void registerHttp(String host) {
     if (getIt.isRegistered<Http>(instanceName: widget.index.toString())) {
+      getIt<Http>(instanceName: widget.index.toString()).close();
       getIt.unregister<Http>(instanceName: widget.index.toString());
     }
     getIt.registerSingleton(

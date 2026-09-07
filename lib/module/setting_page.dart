@@ -662,16 +662,8 @@ class _SettingPageState extends ConsumerState<SettingPage> {
                               ),
                               onPressed: () {
                                 Navigator.of(context1).pop();
-                                SingleAccountPageState.ofUserInfo(context)
-                                    .updateToken(
-                                  SingleAccountPageState.of(context)?.index ??
-                                      0,
-                                  SingleAccountPageState.ofUserInfo(context)
-                                      .host,
-                                  "",
-                                  false,
-                                  SingleAccountPageState.ofUserInfo(context)
-                                      .alias,
+                                SingleAccountPageState.ofUserInfo(context).exitLoginFocus(
+                                  SingleAccountPageState.of(context)?.index ?? 0,
                                 );
                                 Navigator.of(context).pushNamedAndRemoveUntil(
                                   Routes.routeLogin,

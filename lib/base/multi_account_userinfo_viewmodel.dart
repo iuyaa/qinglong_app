@@ -40,9 +40,6 @@ class MultiAccountUserInfoViewModel {
 
       if (tempTokenList != null && tempTokenList.isNotEmpty) {
         for (Map<String, dynamic> value in tempTokenList) {
-          //把token里的空数据拿掉
-          var bean = TokenBean.fromJson(value);
-          if (bean.host == null && bean.token == null) continue;
           tokenBeans.add(TokenBean.fromJson(value));
         }
       }
@@ -95,37 +92,18 @@ class MultiAccountUserInfoViewModel {
   void updateToken(int index, String? host, String? token, bool useSecretLogined, String? alias) {
     if (host == null) return;
 
-    if (MultiAccountUserInfoViewModel.maxAccount == 1) {
-      tokenBeans.clear();
-      tokenBeans.add(
-        TokenBean(
-          token: token,
-          host: host,
-          useSecretLogined: useSecretLogined,
-          alias: alias,
-        ),
-      );
-    } else {
-      if (tokenBeans.length <= index) {
-        tokenBeans.add(
-          TokenBean(
-            token: token,
-            host: host,
-            useSecretLogined: useSecretLogined,
-            alias: alias,
-          ),
-        );
-      } else {
-        tokenBeans[index].token = token;
-        tokenBeans[index].useSecretLogined = useSecretLogined;
-        tokenBeans[index].alias = alias;
-        tokenBeans[index].host = host;
-      }
+    if (index < 0) return;
+    while (tokenBeans.length <= index) {
+      tokenBeans.add(TokenBean());
     }
+    tokenBeans[index] = TokenBean(
+      token: token, host: host, useSecretLogined: useSecretLogined, alias: alias,
+    );
     SpUtil.putString(spTokenBeanList, jsonEncode(tokenBeans));
   }
 
   void removeTokenBean(int index) {
+    if (index < 0 || index >= tokenBeans.length) return;
     tokenBeans[index].token = null;
     tokenBeans[index].host = null;
     tokenBeans[index].alias = null;
