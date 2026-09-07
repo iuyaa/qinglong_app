@@ -27,6 +27,6 @@ try {
     foreach ($entry in @{mdpi=48; hdpi=72; xhdpi=96; xxhdpi=144; xxxhdpi=192}.GetEnumerator()) {
         Export-Icon "android/app/src/main/res/mipmap-$($entry.Key)/ic_launcher.png" $entry.Value
     }
-    # The approved ring occupies ~85% of its canvas; 70% scaling fits the 66/108 safe circle.
-    Export-Icon 'android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png' 432 0.70
+    # Include the source's slight off-center placement within the 66/108 safe circle.
+    Export-Icon 'android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png' 432 0.68
 } finally { $source.Dispose() }
