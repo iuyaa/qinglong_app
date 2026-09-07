@@ -4,6 +4,7 @@ class ViewModel extends ChangeNotifier {}
 
 class BaseViewModel extends ViewModel {
   bool _disposed = false;
+  bool get isDisposed => _disposed;
 
   @override
   void dispose() {

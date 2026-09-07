@@ -24,6 +24,7 @@ class AppKeyViewModel extends BaseViewModel {
     HttpResponse<String> result =
         await SingleAccountPageState.ofApi(context).appKeys();
 
+    if (isDisposed) return;
     if (result.success && result.bean != null) {
       list.clear();
 

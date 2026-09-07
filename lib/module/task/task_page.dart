@@ -1,3 +1,4 @@
+import 'package:qinglong_app/base/confirm_operation.dart';
 import 'dart:async';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import 'package:flutter/cupertino.dart';
@@ -617,122 +618,35 @@ class TaskPageState extends ConsumerState<TaskPage>
     }
   }
 
-  void _executeCode(BuildContext context, String s) {
-    if (checkedIds.isEmpty) {
-      "至少选择1个任务".toast();
-      return;
-    }
+  bool _batchBusy = false;
+  Future<void> _executeCode(BuildContext context, String s) async {
+    if (_batchBusy) return;
+    final api = SingleAccountPageState.ofApi(context);
 
-    showCupertinoDialog(
-      context: context,
-      useRootNavigator: false,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text("确认$s"),
-        content: Text("确认$s吗"),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text(
-              "取消",
-              style: TextStyle(
-                color: Color(0xff999999),
-              ),
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-          ),
-          CupertinoDialogAction(
-            child: Text(
-              "确定",
-              style: TextStyle(
-                color: ref.watch(themeProvider).primaryColor,
-              ),
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-              editMode = false;
-              removeOverlay();
-              WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-                if (s == "运行") {
-                  runTasks();
-                } else if (s == "停止") {
-                  stopTasks();
-                } else if (s == "置顶") {
-                  pinTasks();
-                } else if (s == "取消置顶") {
-                  unPinTasks();
-                } else if (s == "启用") {
-                  enableTask();
-                } else if (s == "禁用") {
-                  disableTasks();
-                } else if (s == "删除") {
-                  deleteTasks();
-                }
-              });
-              setState(() {});
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void runTasks() {
-    ref
-        .read(SingleAccountPageState.ofTaskProvider(context)(getProviderName(context)).notifier)
-        .runCrons(context, checkedIds.toList());
-  }
-
-  void deleteTasks() {
-    ref
-        .read(SingleAccountPageState.ofTaskProvider(context)(getProviderName(context)).notifier)
-        .delCron(context, checkedIds.toList());
-  }
-
-  void disableTasks() {
-    ref
-        .read(SingleAccountPageState.ofTaskProvider(context)(getProviderName(context)).notifier)
-        .enableTask(
-          context,
-          checkedIds.toList(),
-          0,
-        );
-  }
-
-  void enableTask() {
-    ref
-        .read(SingleAccountPageState.ofTaskProvider(context)(getProviderName(context)).notifier)
-        .enableTask(
-          context,
-          checkedIds.toList(),
-          1,
-        );
-  }
-
-  void unPinTasks() {
-    ref
-        .read(SingleAccountPageState.ofTaskProvider(context)(getProviderName(context)).notifier)
-        .pinTask(
-          context,
-          checkedIds.toList(),
-          1,
-        );
-  }
-
-  void pinTasks() {
-    ref
-        .read(SingleAccountPageState.ofTaskProvider(context)(getProviderName(context)).notifier)
-        .pinTask(
-          context,
-          checkedIds.toList(),
-          0,
-        );
-  }
-
-  void stopTasks() {
-    ref
-        .read(SingleAccountPageState.ofTaskProvider(context)(getProviderName(context)).notifier)
-        .stopCrons(context, checkedIds.toList());
+    final model = ref.read(SingleAccountPageState.ofTaskProvider(context)(getProviderName(context)));
+    final selected = model.list.where((e) => checkedIds.contains(e.sId)).toList();
+    final ids = selected.map((e) => e.sId!).toList();
+    final labels = selected.map((e) => '${e.name ?? "任务"} (#${e.sId})').toList();
+    if (labels.isEmpty) { '请先选择操作对象'.toast(); return; }
+    _batchBusy = true;
+    try {
+      if (!await confirmOperation(context, s, labels) || !mounted) return;
+      final operations = {
+        '运行': () => api.startTasks(ids), '停止': () => api.stopTasks(ids),
+        '删除': () => api.delTask(ids), '启用': () => api.enableTask(ids),
+        '禁用': () => api.disableTask(ids), '置顶': () => api.pinTask(ids),
+        '取消置顶': () => api.unpinTask(ids),
+      };
+      final response = await operations[s]!();
+      if (!mounted) return;
+      if (response.success) {
+        checkedIds.clear();
+        editMode = false;
+        removeOverlay();
+        setState(() {});
+        await model.loadData(context, false);
+      } else { (response.message ?? '操作失败，请重试').toast(); }
+    } finally { _batchBusy = false; }
   }
 
   Notify? notify;

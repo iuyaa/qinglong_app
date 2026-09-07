@@ -1,3 +1,4 @@
+import 'package:qinglong_app/base/confirm_operation.dart';
 import 'dart:ui';
 
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
@@ -400,97 +401,31 @@ class DependcyPageState extends ConsumerState<DependencyPage> with TickerProvide
     Overlay.of(context)?.insert(_editModeOverlay!);
   }
 
-  void _executeCode(BuildContext context1, String s) {
-    if (checkedIds.isEmpty) {
-      "至少选择1个依赖".toast();
-      return;
-    }
+  bool _batchBusy = false;
+  Future<void> _executeCode(BuildContext context, String s) async {
+    if (_batchBusy) return;
+    final api = SingleAccountPageState.ofApi(context);
 
-    showCupertinoDialog(
-      context: context1,
-      useRootNavigator: false,
-      builder: (context2) => CupertinoAlertDialog(
-        title: Text("确认$s"),
-        content: Text("确认$s吗"),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text(
-              "取消",
-              style: TextStyle(
-                color: Color(0xff999999),
-              ),
-            ),
-            onPressed: () {
-              Navigator.of(context2).pop();
-            },
-          ),
-          CupertinoDialogAction(
-            child: Text(
-              "确定",
-              style: TextStyle(
-                color: ref.watch(themeProvider).primaryColor,
-              ),
-            ),
-            onPressed: () {
-              Navigator.of(context2).pop();
-              editMode = false;
-              removeOverlay();
-              WidgetsBinding.instance.addPostFrameCallback(
-                (timeStamp) {
-                  if (s == "重新安装") {
-                    List<String?> sids = ref
-                        .read(SingleAccountPageState.ofDependencyProvider(context)(getProviderName(context)).notifier)
-                        .getListByType(_tabController!.index)
-                        .where((element) => checkedIds.contains(element.mustId))
-                        .map((e) => e.sId)
-                        .toList();
-
-                    List<int?> ids = ref
-                        .read(SingleAccountPageState.ofDependencyProvider(context)(getProviderName(context)).notifier)
-                        .getListByType(_tabController!.index)
-                        .where((element) => checkedIds.contains(element.mustId))
-                        .map((e) => e.id)
-                        .toList();
-
-                    reInstalls(context, sids, ids);
-                  } else if (s == "删除") {
-                    List<String?> sids = ref
-                        .read(SingleAccountPageState.ofDependencyProvider(context)(getProviderName(context)).notifier)
-                        .getListByType(_tabController!.index)
-                        .where((element) => checkedIds.contains(element.mustId))
-                        .map((e) => e.sId)
-                        .toList();
-
-                    List<int?> ids = ref
-                        .read(SingleAccountPageState.ofDependencyProvider(context)(getProviderName(context)).notifier)
-                        .getListByType(_tabController!.index)
-                        .where((element) => checkedIds.contains(element.mustId))
-                        .map((e) => e.id)
-                        .toList();
-                    ref.read(SingleAccountPageState.ofDependencyProvider(context)(getProviderName(context)).notifier).del(
-                          context,
-                          types[_tabController!.index].name,
-                          sids,
-                          ids,
-                        );
-                  }
-                },
-              );
-              setState(() {});
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void reInstalls(BuildContext context, List<String?>? sId, List<int?>? id) async {
-    ref.read(SingleAccountPageState.ofDependencyProvider(context)(getProviderName(context))).reInstall(
-          context,
-          types[_tabController!.index].name,
-          sId,
-          id,
-        );
+    final model = ref.read(SingleAccountPageState.ofDependencyProvider(context)(getProviderName(context)));
+    final tab = _tabController!.index;
+    final selected = model.getListByType(tab).where((e) => checkedIds.contains(e.mustId)).toList();
+    final sids = selected.map((e) => e.sId).toList();
+    final ids = selected.map((e) => e.id).toList();
+    final labels = selected.map((e) => '${e.name ?? "依赖"} (#${e.mustId})').toList();
+    if (labels.isEmpty) { '请先选择操作对象'.toast(); return; }
+    _batchBusy = true;
+    try {
+      if (!await confirmOperation(context, s, labels) || !mounted) return;
+      final response = s == '重新安装' ? await api.dependencyReinstall(sids, ids) : await api.delDependency(sids, ids);
+      if (!mounted) return;
+      if (response.success) {
+        checkedIds.clear();
+        editMode = false;
+        removeOverlay();
+        setState(() {});
+        await model.loadData(context, types[tab].name);
+      } else { (response.message ?? '操作失败，请重试').toast(); }
+    } finally { _batchBusy = false; }
   }
 
   @override

@@ -44,6 +44,13 @@ class MultiAccountUserInfoViewModel {
         }
       }
 
+      final order = SpUtil.getObject('pendingAccountOrder')?['indices'];
+      if (order is List && order.every((i) => i is int && i >= 0 && i < tokenBeans.length) &&
+          order.toSet().length == order.length && order.toSet().containsAll(List.generate(order.length, (i) => i))) {
+        tokenBeans = <TokenBean>[...order.map((i) => tokenBeans[i]), ...tokenBeans.skip(order.length)];
+        persistTokens();
+      }
+      SpUtil.remove('pendingAccountOrder');
       List<dynamic>? tempList = jsonDecode(SpUtil.getString(spLoginHistory, defValue: '[]'));
 
       if (tempList != null && tempList.isNotEmpty) {
@@ -69,9 +76,7 @@ class MultiAccountUserInfoViewModel {
   }
 
   void save2HistoryAccount(UserInfoBean userInfoBean) {
-    //如果已经存在host，那就更新
-
-    historyAccounts.removeWhere((element) => element.host == userInfoBean.host);
+    historyAccounts.removeWhere((element) => sameHistoryAccount(element, userInfoBean));
 
     historyAccounts.insert(
       0,
@@ -81,10 +86,11 @@ class MultiAccountUserInfoViewModel {
     SpUtil.putString(spLoginHistory, jsonEncode(historyAccounts));
   }
 
-  void removeHistoryAccount(String? host) {
-    if (host == null || host.isEmpty) return;
+  static bool sameHistoryAccount(UserInfoBean a, UserInfoBean b) =>
+      a.host == b.host && a.userName == b.userName && a.useSecretLogined == b.useSecretLogined;
 
-    historyAccounts.removeWhere((element) => element.host == host);
+  void removeHistoryAccount(UserInfoBean account) {
+    historyAccounts.removeWhere((element) => sameHistoryAccount(element, account));
 
     SpUtil.putString(spLoginHistory, jsonEncode(historyAccounts));
   }
@@ -96,7 +102,9 @@ class MultiAccountUserInfoViewModel {
     while (tokenBeans.length <= index) {
       tokenBeans.add(TokenBean());
     }
+    final previous = tokenBeans[index];
     tokenBeans[index] = TokenBean(
+      userName: previous.host == host && previous.useSecretLogined == useSecretLogined ? previous.userName : null,
       token: token, host: host, useSecretLogined: useSecretLogined, alias: alias,
     );
     SpUtil.putString(spTokenBeanList, jsonEncode(tokenBeans));
@@ -108,12 +116,16 @@ class MultiAccountUserInfoViewModel {
     tokenBeans[index].host = null;
     tokenBeans[index].alias = null;
     tokenBeans[index].useSecretLogined = false;
+    tokenBeans[index].userName = null;
     SpUtil.putString(spTokenBeanList, jsonEncode(tokenBeans));
   }
 
-  void resetTokenBeans(List<TokenBean> bean) {
-    SpUtil.putString(spTokenBeanList, jsonEncode(bean));
-    tokenBeans.clear();
-    tokenBeans.addAll(bean);
+  void persistTokens() => SpUtil.putString(spTokenBeanList, jsonEncode(tokenBeans));
+
+  void saveAccountOrder(List<int> order) {
+    if (order.length != tokenBeans.length || order.toSet().length != order.length ||
+        order.any((i) => i < 0 || i >= tokenBeans.length)) throw ArgumentError('账号列表已变化，请重新打开排序');
+    // Apply on restart; active clients and subsequent token writes keep their current slot.
+    SpUtil.putObject('pendingAccountOrder', {'indices': order});
   }
 }

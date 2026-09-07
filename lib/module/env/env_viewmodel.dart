@@ -28,6 +28,7 @@ class EnvViewModel extends BaseViewModel {
     HttpResponse<List<EnvBean>> result =
         await SingleAccountPageState.ofApi(context).envs("");
 
+    if (isDisposed) return;
     if (result.success && result.bean != null) {
       list.clear();
       list.addAll(result.bean!);
@@ -39,10 +40,8 @@ class EnvViewModel extends BaseViewModel {
       notifyICloud(context, list);
       success();
     } else {
-      list.clear();
-      disabledList.clear();
-      enabledList.clear();
-      failed(result.message, notify: true);
+      if (list.isEmpty) { failed(result.message, notify: true); }
+      else { failToast('刷新失败，当前显示上次数据', notify: true); }
     }
   }
 

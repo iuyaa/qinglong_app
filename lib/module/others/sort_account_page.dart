@@ -22,12 +22,19 @@ class SortAccountPage extends ConsumerStatefulWidget {
 
 class _ChangeAccountPageState extends ConsumerState<SortAccountPage> {
   List<TokenBean> list = [];
+  final _slots = <TokenBean, int>{};
 
   @override
   void initState() {
     try {
       String json = jsonEncode(getIt<MultiAccountUserInfoViewModel>().tokenBeans);
       list.addAll((jsonDecode(json) as List).map((e) => TokenBean.fromJson(e)).toList());
+      for (var i = 0; i < list.length; i++) { _slots[list[i]] = i; }
+      final order = SpUtil.getObject('pendingAccountOrder')?['indices'];
+      if (order is List && order.length == list.length && order.toSet().length == list.length &&
+          order.every((i) => i is int && i >= 0 && i < list.length)) {
+        list = order.map((i) => list[i]).toList();
+      }
     } catch (e) {}
 
     super.initState();
@@ -43,7 +50,12 @@ class _ChangeAccountPageState extends ConsumerState<SortAccountPage> {
           CommitButton(
             title: "保存",
             onTap: () {
-              getIt<MultiAccountUserInfoViewModel>().resetTokenBeans(list);
+              final accounts = getIt<MultiAccountUserInfoViewModel>();
+              if (accounts.tokenBeans.length != list.length) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('账号列表已变化，请重新打开排序')));
+                return;
+              }
+              accounts.saveAccountOrder(list.map((e) => _slots[e]!).toList());
               showCupertinoDialog(
                 useRootNavigator: false,
                 context: context,
@@ -91,7 +103,7 @@ class _ChangeAccountPageState extends ConsumerState<SortAccountPage> {
           },
           children: list
               .map((e) => ClipRRect(
-                    key: ValueKey(e.host),
+                    key: ObjectKey(e),
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       color: ref.watch(themeProvider).themeColor.settingBordorColor(),

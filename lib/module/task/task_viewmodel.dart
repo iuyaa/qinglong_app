@@ -1,3 +1,4 @@
+import 'package:qinglong_app/base/confirm_operation.dart';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
@@ -48,7 +49,8 @@ class TaskViewModel extends BaseViewModel {
     if (getIt<SystemBean>(instanceName: (SingleAccountPageState.of(context)?.index ?? 0).toString())
         .isUpperVersion2_13_9()) {
       var temp = await SingleAccountPageState.ofApi(context).crons2_13_09();
-      if (temp.success && temp.bean != null) {
+      if (isDisposed) return;
+    if (temp.success && temp.bean != null) {
         list.clear();
         list.addAll(temp.bean?.data ?? []);
         sortList(context);
@@ -59,11 +61,12 @@ class TaskViewModel extends BaseViewModel {
           runAllTasks(context);
         }
       } else {
-        list.clear();
-        failed(temp.message, notify: true);
+        if (list.isEmpty) { failed(temp.message, notify: true); }
+        else { failToast("刷新失败，当前显示上次数据", notify: true); }
       }
     } else {
       HttpResponse<List<TaskBean>> result = await SingleAccountPageState.ofApi(context).crons();
+      if (isDisposed) return;
       if (result.success && result.bean != null) {
         list.clear();
         list.addAll(result.bean!);
@@ -75,8 +78,8 @@ class TaskViewModel extends BaseViewModel {
           runAllTasks(context);
         }
       } else {
-        list.clear();
-        failed(result.message, notify: true);
+        if (list.isEmpty) { failed(result.message, notify: true); }
+        else { failToast("刷新失败，当前显示上次数据", notify: true); }
       }
     }
   }
@@ -259,11 +262,16 @@ class TaskViewModel extends BaseViewModel {
     }
   }
 
-  void runAllTasks(BuildContext context) {
+  Future<void> runAllTasks(BuildContext context) async {
     runAllTasked = true;
-    List<String> ids =
-        list.where((element) => element.isDisabled != 1).map((e) => e.sId ?? "").toList();
-    "已运行${ids.length}个任务".toast();
-    runCrons(context, ids);
+    final api = SingleAccountPageState.ofApi(context);
+    final selected = list.where((e) => e.isDisabled != 1 && e.sId != null).toList();
+    final ids = selected.map((e) => e.sId!).toList();
+    if (!await confirmOperation(context, '运行', selected.map((e) => '${e.name ?? "任务"} (#${e.sId})').toList())) return;
+    final response = await api.startTasks(ids);
+    if (isDisposed) return;
+    if (response.success) { await loadData(context, false); }
+    else { failToast(response.message, notify: true); }
   }
+
 }

@@ -24,6 +24,7 @@ class SubscribeViewModel extends BaseViewModel {
     HttpResponse<String> result =
         await SingleAccountPageState.ofApi(context).subscribes();
 
+    if (isDisposed) return;
     if (result.success && result.bean != null) {
       list.clear();
 
@@ -40,8 +41,9 @@ class SubscribeViewModel extends BaseViewModel {
 
       success();
     } else {
-      list.clear();
-      if (result.code == 404) {
+      if (list.isNotEmpty) {
+        failToast('刷新失败，当前显示上次数据', notify: true);
+      } else if (result.code == 404) {
         failed("当前版本不支持订阅管理,如有需要请先将服务器更新到青龙最新版", notify: true);
       } else {
         failed(result.message, notify: true);

@@ -85,6 +85,15 @@ flutter:
     - assets/scan.json
     - assets/images/
     - assets/codemirror.html
+    - assets/codemirror/lib/
+    - assets/codemirror/theme/
+    - assets/codemirror/addon/search/
+    - assets/codemirror/addon/dialog/
+    - assets/codemirror/addon/fold/
+    - assets/codemirror/mode/shell/
+    - assets/codemirror/mode/javascript/
+    - assets/codemirror/mode/python/
+    - assets/codemirror/mode/yaml/
 flutter_app_name:
   name: "青龙客户端"
 

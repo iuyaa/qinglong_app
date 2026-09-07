@@ -1,3 +1,4 @@
+import 'package:qinglong_app/base/confirm_operation.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -382,78 +383,32 @@ class EnvPageState extends ConsumerState<EnvPage> with TickerProviderStateMixin 
     Overlay.of(context)?.insert(_editModeOverlay!);
   }
 
-  void _executeCode(BuildContext context, String s) {
-    if (checkedIds.isEmpty) {
-      "至少选择1个变量".toast();
-      return;
-    }
+  bool _batchBusy = false;
+  Future<void> _executeCode(BuildContext context, String s) async {
+    if (_batchBusy) return;
+    final api = SingleAccountPageState.ofApi(context);
 
-    showCupertinoDialog(
-      context: context,
-      useRootNavigator: false,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text("确认$s"),
-        content: Text("确认$s吗"),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text(
-              "取消",
-              style: TextStyle(
-                color: Color(0xff999999),
-              ),
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-          ),
-          CupertinoDialogAction(
-            child: Text(
-              "确定",
-              style: TextStyle(
-                color: ref.watch(themeProvider).primaryColor,
-              ),
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-              editMode = false;
-              removeOverlay();
-              WidgetsBinding.instance.addPostFrameCallback(
-                (timeStamp) {
-                  if (s == "启用") {
-                    enableEnv();
-                  } else if (s == "禁用") {
-                    disableEnv();
-                  } else if (s == "删除") {
-                    deleteEnvs();
-                  }
-                },
-              );
-              setState(() {});
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void enableEnv() {
-    ref.read(SingleAccountPageState.ofEnvProvider(context)(getProviderName(context)).notifier).enableEnv(
-          context,
-          checkedIds.toList(),
-          1,
-        );
-  }
-
-  void disableEnv() {
-    ref.read(SingleAccountPageState.ofEnvProvider(context)(getProviderName(context)).notifier).enableEnv(
-          context,
-          checkedIds.toList(),
-          0,
-        );
-  }
-
-  void deleteEnvs() {
-    ref.read(SingleAccountPageState.ofEnvProvider(context)(getProviderName(context)).notifier).delEnvs(context, checkedIds.toList());
+    final model = ref.read(SingleAccountPageState.ofEnvProvider(context)(getProviderName(context)));
+    final selected = model.list.where((e) => checkedIds.contains(e.sId)).toList();
+    final ids = selected.map((e) => e.sId!).toList();
+    final labels = selected.map((e) => '${e.name ?? "环境变量"} (#${e.sId})').toList();
+    if (labels.isEmpty) { '请先选择操作对象'.toast(); return; }
+    _batchBusy = true;
+    try {
+      if (!await confirmOperation(context, s, labels) || !mounted) return;
+      final operations = {
+        '启用': () => api.enableEnv(ids), '禁用': () => api.disableEnv(ids), '删除': () => api.delEnvs(ids),
+      };
+      final response = await operations[s]!();
+      if (!mounted) return;
+      if (response.success) {
+        checkedIds.clear();
+        editMode = false;
+        removeOverlay();
+        setState(() {});
+        await model.loadData(context, false);
+      } else { (response.message ?? '操作失败，请重试').toast(); }
+    } finally { _batchBusy = false; }
   }
 
   void removeOverlay() {

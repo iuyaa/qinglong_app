@@ -46,7 +46,8 @@ class DependencyViewModel extends BaseViewModel {
 
     HttpResponse<List<DependencyBean>> response =
         await SingleAccountPageState.ofApi(context).dependencies(type);
-    if (response.success) {
+    if (isDisposed) return;
+    if (response.success && response.bean != null) {
       if (type == "nodejs") {
         nodeJsList.clear();
         nodeJsList.addAll(response.bean!);
@@ -61,7 +62,8 @@ class DependencyViewModel extends BaseViewModel {
       }
       success();
     } else {
-      response.message?.toast();
+      if (nodeJsList.isEmpty && python3List.isEmpty && linuxList.isEmpty) { failed(response.message, notify: true); }
+      else { failToast('刷新失败，当前显示上次数据', notify: true); }
     }
   }
 
@@ -71,8 +73,10 @@ class DependencyViewModel extends BaseViewModel {
     List<String?>? sId,
     List<int?>? id,
   ) async {
-    await SingleAccountPageState.ofApi(context).dependencyReinstall(sId, id);
-    await loadData(context, type);
+    final result = await SingleAccountPageState.ofApi(context).dependencyReinstall(sId, id);
+    if (isDisposed) return;
+    if (result.success) { await loadData(context, type); }
+    else { failToast(result.message, notify: true); }
   }
 
   Future<void> del(
@@ -81,7 +85,10 @@ class DependencyViewModel extends BaseViewModel {
     List<String?>? sId,
     List<int?>? ids,
   ) async {
-    await SingleAccountPageState.ofApi(context).delDependency(sId, ids);
+    final result = await SingleAccountPageState.ofApi(context).delDependency(sId, ids);
+    if (isDisposed) return;
+    if (result.success) { await loadData(context, type); }
+    else { failToast(result.message, notify: true); }
   }
 }
 

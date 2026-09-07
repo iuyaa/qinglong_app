@@ -18,6 +18,10 @@ concurrency:
 
 jobs:
   build:
+    permissions:
+      contents: write
+    env:
+      APP_VERSION: '3.0.4'
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     steps:
@@ -58,7 +62,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: flutter build apk --release --build-name=3.0.3 --build-number=${{ github.run_number }}
+        run: flutter build apk --release --build-name="$APP_VERSION" --build-number=${{ github.run_number }}
       - name: Build PR debug APK
         if: github.event_name == 'pull_request'
         run: flutter build apk --debug
@@ -79,6 +83,15 @@ jobs:
           path: artifacts/
           if-no-files-found: error
           retention-days: 14
+      - name: Publish App update
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/release_manifest.py
+          TAG="v$APP_VERSION+$GITHUB_RUN_NUMBER"
+          gh release create "$TAG" artifacts/qinglong-android.apk artifacts/SHA256SUMS.txt artifacts/update.json --target "$GITHUB_SHA" --title "青龙客户端 $APP_VERSION ($GITHUB_RUN_NUMBER)" --notes-file docs/RELEASE-NOTES.md --draft
+          gh release edit "$TAG" --draft=false --latest
       - name: Remove signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/qinglong.jks"

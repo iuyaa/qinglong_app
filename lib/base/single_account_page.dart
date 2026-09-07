@@ -177,16 +177,17 @@ class SingleAccountPageState extends State<SingleAccountPage> {
     registerProvider();
     if (getIt<MultiAccountUserInfoViewModel>().tokenBeans.isNotEmpty && getIt<MultiAccountUserInfoViewModel>().tokenBeans.length > widget.index) {
       var bean = getIt<MultiAccountUserInfoViewModel>().tokenBeans[index];
-      UserInfoBean history = getIt<MultiAccountUserInfoViewModel>().historyAccounts.firstWhere((element) => element.host == bean.host, orElse: () {
-        return UserInfoBean();
-      });
+      final candidates = getIt<MultiAccountUserInfoViewModel>().historyAccounts.where((entry) =>
+          entry.host == bean.host && entry.useSecretLogined == bean.useSecretLogined &&
+          (bean.userName == null || entry.userName == bean.userName)).toList();
+      final history = candidates.length == 1 ? candidates.single : UserInfoBean();
       UserInfoViewModel userInfoViewModel = UserInfoViewModel(
         token: bean.token,
         useSecret: bean.useSecretLogined,
         host: bean.host,
         name: history.userName,
         password: history.password,
-        alias: history.alias,
+        alias: bean.alias ?? history.alias,
       );
 
       getIt.registerSingleton(

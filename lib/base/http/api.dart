@@ -331,7 +331,7 @@ class Api {
 
   Future<HttpResponse<String>> content(String name) async {
     return await _http.get<String>(
-      getIt<Url>(instanceName: index.toString()).configContent + name,
+      getIt<Url>(instanceName: index.toString()).configContent + Uri.encodeComponent(name),
       null,
     );
   }
@@ -579,7 +579,7 @@ class Api {
       );
     }
 
-    if (response.success == false && focus) {
+    if (focus && (response.code == 404 || response.code == 405)) {
       url = getIt<Url>(instanceName: index.toString()).dependencies;
       if (sIds != null && sIds.isNotEmpty && sIds[0] != null) {
         response = await _http.delete<NullResponse>(
@@ -624,7 +624,7 @@ class Api {
     );
   }
 
-  Future<HttpResponse<NullResponse>> deleteAppKey(List<String> data) async {
+  Future<HttpResponse<NullResponse>> deleteAppKey(List<dynamic> data) async {
     return await _http.delete<NullResponse>(
       getIt<Url>(instanceName: index.toString()).appkeys,
       data,

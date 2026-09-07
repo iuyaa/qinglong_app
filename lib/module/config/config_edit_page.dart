@@ -1,3 +1,4 @@
+import 'package:qinglong_app/module/code_editor/edit_guard.dart';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
@@ -32,6 +33,7 @@ class ConfigEditPage extends ConsumerStatefulWidget {
 class _ConfigEditPageState extends ConsumerState<ConfigEditPage> {
   CodeMirrorOptions options = CodeMirrorOptions();
   EditorController? controller;
+  bool _saving = false;
   late String result;
   late String preResult;
   List<String> operateList = [];
@@ -97,56 +99,13 @@ class _ConfigEditPageState extends ConsumerState<ConfigEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () => confirmLeaveEditor(context, preResult != result, _saving),
+      child: Scaffold(
       backgroundColor: ref.watch(themeProvider).themeColor.codeBgColor(),
       appBar: QlAppBar(
         canBack: true,
-        backCall: () {
-          FocusManager.instance.primaryFocus?.unfocus();
-
-          if (preResult == result) {
-            Navigator.of(context).pop();
-          } else {
-            showCupertinoDialog(
-              context: context,
-              useRootNavigator: false,
-              builder: (childContext) => AlertDialog(
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 15,
-                ),
-                elevation: 0,
-                title: const Text("温馨提示"),
-                content: const Text("你编辑的内容还没用提交,确定退出吗?"),
-                actions: [
-                  TextButton(
-                    child: const Text(
-                      "取消",
-                      style: TextStyle(
-                        color: Color(0xff999999),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.of(childContext).pop();
-                    },
-                  ),
-                  TextButton(
-                    child: Text(
-                      "确定",
-                      style: TextStyle(
-                        color: ref.watch(themeProvider).primaryColor,
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.of(childContext).pop();
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ],
-              ),
-            );
-          }
-        },
+        backCall: () => Navigator.of(context).maybePop(),
         title: '编辑${widget.title}',
         actions: [
           CupertinoButton(
@@ -200,23 +159,33 @@ class _ConfigEditPageState extends ConsumerState<ConfigEditPage> {
           CupertinoButton(
             color: Colors.transparent,
             padding: EdgeInsets.zero,
-            onPressed: () async {
+            onPressed: _saving ? null : () async {
+              if (_saving) return;
+              setState(() => _saving = true);
+              final api = SingleAccountPageState.ofApi(context);
+              final submitted = result;
               try {
                 await hideKeyboardFocus();
                 await EasyLoading.show(status: " 提交中");
-                HttpResponse<NullResponse> response = await SingleAccountPageState.ofApi(context).saveFile(widget.title, result);
-                if (Platform.isIOS) {
-                  await notifyICloud(context, widget.title, result);
+                HttpResponse<NullResponse> response = await api.saveFile(widget.title, submitted);
+                if (!mounted) return;
+                if (response.success && Platform.isIOS) {
+                  await notifyICloud(context, widget.title, submitted);
                 }
                 await EasyLoading.dismiss();
+                if (!mounted) return;
                 if (response.success) {
+                  preResult = submitted;
                   "提交成功".toast();
-                  Navigator.of(context).pop(result);
+                  if (result == submitted) Navigator.of(context).pop(submitted);
                 } else {
                   (response.message ?? "").toast();
                 }
-              } catch (e) {
+              } catch (_) {
+                if (mounted) '保存失败，修改已保留，请重试'.toast();
+              } finally {
                 EasyLoading.dismiss();
+                if (mounted) setState(() => _saving = false);
               }
             },
             child: Padding(
@@ -250,6 +219,7 @@ class _ConfigEditPageState extends ConsumerState<ConfigEditPage> {
             result = val;
           },
         ),
+      ),
       ),
     );
   }

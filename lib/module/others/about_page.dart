@@ -1,3 +1,4 @@
+import 'update/app_update_page.dart';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
@@ -359,7 +360,7 @@ class _AboutPageState extends ConsumerState<AboutPage> with LazyLoadState<AboutP
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: () {
-                          _launchURL("https://github.com/iuyaa/qinglong_app");
+                          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AppUpdatePage()));
                         },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -377,7 +378,7 @@ class _AboutPageState extends ConsumerState<AboutPage> with LazyLoadState<AboutP
                                 width: 15,
                               ),
                               Text(
-                                "App更新通知",
+                                "App 更新",
                                 style: TextStyle(
                                   color: ref.watch(themeProvider).themeColor.titleColor(),
                                   fontSize: 16,
@@ -453,7 +454,7 @@ class _AboutPageState extends ConsumerState<AboutPage> with LazyLoadState<AboutP
               ),
               Center(
                 child: Text(
-                  "APP不会收集任何关于您的信息,使用前请仔细阅读用户协议",
+                  "账号保存在本机，更新从本项目 GitHub 发布页获取",
                   style: TextStyle(
                     color: ref.watch(themeProvider).themeColor.descColor(),
                     fontSize: 12,

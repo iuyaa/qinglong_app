@@ -72,7 +72,12 @@ class UserInfoViewModel {
     _passWord = password;
     _alias = alias;
 
-    getIt<MultiAccountUserInfoViewModel>().save2HistoryAccount(UserInfoBean(
+    final accounts = getIt<MultiAccountUserInfoViewModel>();
+    for (final bean in accounts.tokenBeans) {
+      if (bean.host == host && bean.token == _token && bean.useSecretLogined == secretLogin) bean.userName = userName;
+    }
+    accounts.persistTokens();
+    accounts.save2HistoryAccount(UserInfoBean(
       userName: _userName,
       host: _host,
       useSecretLogined: _useSecertLogined,
@@ -134,12 +139,14 @@ class UserInfoBean {
 }
 
 class TokenBean {
+  String? userName;
   String? token;
   bool useSecretLogined = false;
   String? host;
   String? alias;
 
   TokenBean({
+    this.userName,
     this.token,
     this.useSecretLogined = false,
     this.host,
@@ -147,6 +154,7 @@ class TokenBean {
   });
 
   TokenBean.fromJson(Map<String, dynamic> json) {
+    userName = json['userName'];
     token = json['token'];
     useSecretLogined = json['useSecretLogined'] ?? false;
     host = json['host'];
@@ -155,6 +163,7 @@ class TokenBean {
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
+    data['userName'] = userName;
     data['token'] = token;
     data['useSecretLogined'] = useSecretLogined;
     data['host'] = host;

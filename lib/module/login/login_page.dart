@@ -618,7 +618,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       contentPadding: EdgeInsets.zero,
       trailing: GestureDetector(
           onTap: () {
-            getIt<MultiAccountUserInfoViewModel>().removeHistoryAccount(bean.host);
+            getIt<MultiAccountUserInfoViewModel>().removeHistoryAccount(bean);
             Navigator.pop(context);
 
             setState(() {});

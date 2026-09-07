@@ -22,6 +22,7 @@ class Http {
 
   final bool authenticated;
   bool _closed = false;
+  final _pendingWrites = <String>{};
 
   Http(this.host, this.index, {this.authenticated = true}) {
     _dio = Dio(BaseOptions(
@@ -63,6 +64,10 @@ class Http {
   Future<HttpResponse<T>> _request<T>(String method, String uri, dynamic json,
       bool compute, String serializationName) async {
     if (_closed) return _cancelled<T>();
+    final writeKey = method == 'GET' ? null : '$method $uri ${jsonEncode(json)}';
+    if (writeKey != null && !_pendingWrites.add(writeKey)) {
+      return HttpResponse(success: false, code: -1002, message: '此操作正在提交，请稍候');
+    }
     try {
       final response = await _dio!.request(uri,
           options: Options(method: method),
@@ -72,6 +77,8 @@ class Http {
       return _handleAuth(decodeResponse<T>(response, serializationName, compute), uri);
     } on DioError catch (e) {
       return exceptionHandler<T>(e, uri);
+    } finally {
+      if (writeKey != null) _pendingWrites.remove(writeKey);
     }
   }
 

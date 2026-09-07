@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -32,13 +33,27 @@ class CodeMirrorView extends CodeMirrorViewImpl {
   }
 }
 
+Future<String> editorHtml(CodeMirrorOptions options) async {
+  var html = await rootBundle.loadString('assets/codemirror.html');
+  final mode = ['shell', 'javascript', 'python', 'yaml'].contains(options.mode) ? options.mode : 'shell';
+  final theme = options.theme == '3024-night' ? '3024-night' : 'neat';
+  html = html.replaceAll('EDITOR_THEME', theme).replaceAll('EDITOR_MODE', mode);
+  final pattern = RegExp(r'<link\s+rel="stylesheet"\s+href="([^"]+)"\s*/>|<script src="([^"]+)"></script>');
+  for (final match in pattern.allMatches(html).toList()) {
+    final css = match.group(1);
+    final content = await rootBundle.loadString('assets/${css ?? match.group(2)}');
+    html = html.replaceFirst(match.group(0)!, css != null
+        ? '<style>$content</style>' : '<script>${content.replaceAll('</script', r'<\/script')}</script>');
+  }
+  return html;
+}
+
 class CodeMirrorViewState extends CodeMirrorViewImplState<CodeMirrorView> {
-  String getHtml(String raw) {
-    String _html = raw;
-    _html = _html.replaceAll('VERSION', '5.65.6');
-    _html = _html.replaceAll('EDITOR_THEME', widget.options.theme);
-    _html = _html.replaceAll('EDITOR_MODE', widget.options.mode);
-    return Uri.dataFromString(_html, mimeType: 'text/html').toString();
+  late final Future<String> _document;
+  @override
+  void initState() {
+    super.initState();
+    _document = editorHtml(widget.options).then((html) => Uri.dataFromString(html, mimeType: 'text/html').toString());
   }
 
   WebViewController? _controller;
@@ -66,8 +81,9 @@ class CodeMirrorViewState extends CodeMirrorViewImplState<CodeMirrorView> {
   Widget build(BuildContext context) {
     if (Platform.isAndroid) WebView.platform = SurfaceAndroidWebView();
     return FutureBuilder<String>(
-        future: rootBundle.loadString('assets/codemirror.html'),
+        future: _document,
         builder: (context, snapshot) {
+          if (snapshot.hasError) return const Center(child: Text('编辑器加载失败，请返回重试'));
           if (!snapshot.hasData) {
             return const Center(child: LoadingWidget());
           }
@@ -82,8 +98,10 @@ class CodeMirrorViewState extends CodeMirrorViewImplState<CodeMirrorView> {
 
                 return WebView(
                   backgroundColor: ref.watch(themeProvider).themeColor.codeBgColor(),
-                  debuggingEnabled: true,
-                  initialUrl: getHtml(snapshot.data ?? ""),
+                  debuggingEnabled: kDebugMode,
+                  initialUrl: snapshot.data!,
+                  navigationDelegate: (request) => request.url.startsWith('data:text/html')
+                      ? NavigationDecision.navigate : NavigationDecision.prevent,
                   onWebViewCreated: (controller) {
                     if (MultiAccountPageState.useAction().isEmpty) {
                       if (!isLoadedJs) {
@@ -126,9 +144,6 @@ class CodeMirrorViewState extends CodeMirrorViewImplState<CodeMirrorView> {
                           'editor.refresh()',
                         );
                         await EasyLoading.dismiss();
-                        if (widget.options.mode != val.mode || widget.options.theme != val.theme) {
-                          await _controller?.loadUrl(getHtml(snapshot.data ?? ""));
-                        }
                       },
                       setValue: (val) async {
                         TextPainter painter = TextPainter(
