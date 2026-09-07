@@ -85,6 +85,7 @@ flutter:
     - assets/scan.json
     - assets/images/
     - assets/codemirror.html
+    - assets/codemirror/LICENSE
     - assets/codemirror/lib/
     - assets/codemirror/theme/
     - assets/codemirror/addon/search/

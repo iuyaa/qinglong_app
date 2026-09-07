@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qinglong_app/base/http/http.dart';
 import 'package:qinglong_app/base/multi_account_userinfo_viewmodel.dart';
@@ -93,6 +94,7 @@ void main() {
   });
 
   test('Editor HTML includes every runtime resource without CDN fetches', () async {
+    expect(await rootBundle.loadString('assets/codemirror/LICENSE'), contains('Permission is hereby granted'));
     for (final mode in ['shell', 'javascript', 'python', 'yaml']) {
       final html = await editorHtml(CodeMirrorOptions(mode: mode));
       expect(RegExp(r'<script\s+src=|<link\s+rel=').hasMatch(html), isFalse);
