@@ -98,11 +98,8 @@ flutter:
 flutter_app_name:
   name: "青龙客户端"
 
-flutter_icons:
-  image_path_android: "assets/images/ql.png"
-  image_path_ios: "assets/images/ql_white.png"
-  android: true # can specify file name here e.g. "ic_launcher"
-  ios: true # can specify file name here e.g. "My-Launcher-Icon"
+# Android icon resources are exported from branding/qinglong-icon.png by
+# scripts/export-icon.ps1, including the adaptive-icon safe padding.
 
 
 flutter_native_splash:
