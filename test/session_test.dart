@@ -63,7 +63,8 @@ void main() {
       await getIt.reset();
     });
     Future<T> real<T>(Future<T> Function() work) => HttpOverrides.runWithHttpOverrides(work, LoopbackHttp());
-    Future<T?> io<T>(Future<T> Function() work) => tester.runAsync(() => real(work));
+    Future<T?> io<T>(Future<T> Function() work) => tester.runAsync(
+      () => real(() => work().timeout(const Duration(seconds: 20))));
     Future<String> server(String panel) async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       servers.add(server);
@@ -107,6 +108,7 @@ void main() {
     }
     final a = (await io(() => server('a')))!;
     final b = (await io(() => server('b')))!;
+    debugPrint('session check: loopback servers ready');
     final accounts = MultiAccountUserInfoViewModel();
     accounts.updateToken(0, a, 'synthetic-a', false, 'A');
     accounts.updateToken(3, 'https://synthetic.invalid', 'synthetic-other', true, 'Other');
@@ -128,6 +130,7 @@ void main() {
     oldTasks.success();
     await tester.pump();
     expect(find.text('$a:cached-A'), findsOneWidget);
+    debugPrint('session check: original session ready');
     final wrong = LoginHelper(b, 'synthetic', 'wrong', true, 'B');
     expect(await io(() => wrong.login(panelContext)), LoginHelper.failed);
     expect(user.host, a);
@@ -138,6 +141,7 @@ void main() {
     expect(await io(() => empty.login(panelContext)), LoginHelper.failed);
     expect(user.host, a);
     empty.cancel();
+    debugPrint('session check: failed logins preserve original session');
 
     final cancelled = LoginHelper(b, 'synthetic', 'ok', true, 'B');
     expect(await io(() => cancelled.login(panelContext)), LoginHelper.twiceLogin);
@@ -149,6 +153,7 @@ void main() {
     expect(user.host, a);
     expect(oldHttp.isClosed, isFalse);
 
+    debugPrint('session check: two-factor cancellation complete');
     final superseded = LoginHelper(b, 'synthetic', 'ok', true, 'B');
     expect(await io(() => superseded.login(panelContext)), LoginHelper.twiceLogin);
     final login = LoginHelper(b, 'synthetic', 'ok', true, 'B');
@@ -160,6 +165,7 @@ void main() {
     expect(await io(() => login.loginTwice(panelContext, '12')), LoginHelper.twiceLogin);
     expect(requests.length, count);
     expect(await io(() => login.loginTwice(panelContext, '000000')), LoginHelper.twiceLogin);
+    debugPrint('session check: two-factor retry complete');
     Future<HttpResponse<String>>? lateLog;
     await io(() async {
       lateLog = oldApi.inTimeLog('102');
@@ -178,6 +184,7 @@ void main() {
     expect(find.text('$a:cached-A'), findsNothing);
     expect(find.text('$b:'), findsOneWidget);
     expect(container.read(owner.taskProvider(a)).list, isEmpty);
+    debugPrint('session check: old requests and caches isolated');
 
     final app = LoginHelper(b, 'synthetic-id', 'synthetic-secret', true, 'B', useSecretLogin: true);
     expect(await io(() => app.login(panelContext)), LoginHelper.success);
@@ -207,7 +214,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
+    debugPrint('session check: expiry complete; closing servers');
     await io(() async { for (final server in servers) { await server.close(force: true); } });
     await getIt.reset();
-  });
+  }, timeout: const Timeout(Duration(minutes: 2)));
 }
