@@ -21,7 +21,7 @@ jobs:
     permissions:
       contents: write
     env:
-      APP_VERSION: '3.0.4'
+      APP_VERSION: '3.0.5'
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     steps:

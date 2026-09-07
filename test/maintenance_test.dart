@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +17,42 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('Update manifest falls back to official asset API without trusting a supplied API URL', () async {
+    final dio = Dio();
+    final requests = <RequestOptions>[];
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (request, handler) {
+      requests.add(request);
+      if (request.uri.host == 'github.com') {
+        handler.reject(DioError(requestOptions: request, type: DioErrorType.connectTimeout));
+      } else {
+        handler.resolve(Response<String>(requestOptions: request, data: '{"versionCode":10}', statusCode: 200));
+      }
+    }));
+    final asset = {'id': 123, 'url': 'https://evil.invalid/manifest',
+      'browser_download_url': 'https://github.com/iuyaa/qinglong_app/releases/download/v3.0.4%2B10/update.json'};
+    try {
+      expect((await readUpdateManifest(dio, asset))['versionCode'], 10);
+      expect(requests.length, 2);
+      expect(requests.last.uri.toString(), 'https://api.github.com/repos/iuyaa/qinglong_app/releases/assets/123');
+      expect(requests.last.headers['Accept'], 'application/octet-stream');
+      expect(requests.last.headers.containsKey('Authorization'), isFalse);
+      requests.clear();
+      await expectLater(readUpdateManifest(dio, {...asset, 'browser_download_url': 'https://evil.invalid/update.json'}), throwsFormatException);
+      expect(requests, isEmpty);
+      await expectLater(readUpdateManifest(dio, {...asset, 'id': '../elsewhere'}), throwsA(isA<DioError>()));
+      expect(requests.length, 1);
+    } finally { dio.close(); }
+  });
+
+  test('Update failures distinguish timeout, HTTP errors and malformed metadata', () {
+    DioError error(int status) => DioError(requestOptions: RequestOptions(path: releaseApi),
+      response: Response(requestOptions: RequestOptions(path: releaseApi), statusCode: status), type: DioErrorType.response);
+    expect(updateFailure(error(404)), contains('HTTP 404'));
+    expect(updateFailure(error(403)), contains('限流或拒绝访问'));
+    expect(updateFailure(DioError(requestOptions: RequestOptions(path: releaseApi), type: DioErrorType.connectTimeout)), contains('超时'));
+    expect(updateFailure(const FormatException('private detail')), isNot(contains('private detail')));
+  });
 
   test('Update metadata requires our stable release, matching APK and hash', () {
     const url = 'https://github.com/iuyaa/qinglong_app/releases/download/v3.0.4%2B8/qinglong-android.apk';

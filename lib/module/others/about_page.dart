@@ -16,7 +16,6 @@ import 'package:qinglong_app/module/home/system_bean.dart';
 import 'package:qinglong_app/utils/extension.dart';
 import 'package:qinglong_app/utils/sp_utils.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../main.dart';
 
@@ -265,7 +264,7 @@ class _AboutPageState extends ConsumerState<AboutPage> with LazyLoadState<AboutP
                           ),
                           onTap: () async {
                             try {
-                              await launchUrl(Uri.tryParse("https://github.com/iuyaa/qinglong_app")!);
+                              _launchURL(repositoryPage);
                             } catch (e) {
                               logger.e(e);
                             }
@@ -288,7 +287,7 @@ class _AboutPageState extends ConsumerState<AboutPage> with LazyLoadState<AboutP
                                   width: 15,
                                 ),
                                 Text(
-                                  "下载地址",
+                                  "项目仓库 / 下载",
                                   style: TextStyle(
                                     color: ref.watch(themeProvider).themeColor.titleColor(),
                                     fontSize: 16,
@@ -472,11 +471,7 @@ class _AboutPageState extends ConsumerState<AboutPage> with LazyLoadState<AboutP
   }
 
   void _launchURL(String _url) async {
-    try {
-      await launchUrl(Uri.tryParse(_url.trimLeft())!);
-    } catch (e) {
-      logger.e(e);
-    }
+    if (!await openProjectUrl(_url.trim()) && mounted) "无法打开浏览器，请稍后重试".toast();
   }
 
   void getInfo() async {

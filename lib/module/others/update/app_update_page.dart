@@ -7,9 +7,48 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const releasePage = 'https://github.com/iuyaa/qinglong_app/releases/latest';
+const repositoryPage = 'https://github.com/iuyaa/qinglong_app';
+const releasePage = '$repositoryPage/releases';
 const releaseApi = 'https://api.github.com/repos/iuyaa/qinglong_app/releases/latest';
 const updateChannel = MethodChannel('io.github.iuyaa.qinglong/update');
+
+Future<bool> openProjectUrl(String url) async {
+  try { return await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication); }
+  catch (_) { return false; }
+}
+
+// Use GitHub's asset API when the website download route is unavailable.
+Future<Map<String, dynamic>> readUpdateManifest(Dio dio, Map asset) async {
+  final url = releaseAssetUrl(asset['browser_download_url']);
+  Response<String> response;
+  try {
+    response = await dio.get<String>(url, options: Options(responseType: ResponseType.plain,
+      headers: {'Accept': 'application/octet-stream'}));
+  } on DioError {
+    final id = asset['id'];
+    if (id is! int || id <= 0) rethrow;
+    response = await dio.get<String>('https://api.github.com/repos/iuyaa/qinglong_app/releases/assets/$id',
+      options: Options(responseType: ResponseType.plain,
+        headers: {'Accept': 'application/octet-stream'}));
+  }
+  return Map<String, dynamic>.from(jsonDecode(response.data!) as Map);
+}
+
+String updateFailure(Object error) {
+  if (error is DioError) {
+    final status = error.response?.statusCode;
+    if (status == 403 || status == 429) return 'GitHub 限流或拒绝访问（HTTP $status），请稍后重试';
+    if (status == 404) return '未找到公开版本或更新文件（HTTP 404）';
+    if (status != null) return 'GitHub 请求失败（HTTP $status）';
+    if (error.type == DioErrorType.connectTimeout || error.type == DioErrorType.receiveTimeout ||
+        error.type == DioErrorType.sendTimeout) return '连接 GitHub 超时，请检查网络后重试';
+    return '无法连接 GitHub，请检查网络或代理设置';
+  }
+  if (error is FormatException || error is TypeError || error is StateError) {
+    return '更新信息不完整或校验不通过，请到仓库查看发布版本';
+  }
+  return '无法完成更新检查，请重试';
+}
 
 // Only our published assets can supply an update; panel credentials never enter this client.
 String releaseAssetUrl(dynamic value) {
@@ -76,24 +115,27 @@ class _AppUpdatePageState extends State<AppUpdatePage> {
   Future<void> _check() async {
     if (_busy) return;
     setState(() { _busy = true; _status = '正在检查更新'; _release = null; _apk = null; });
+    var stage = '读取当前版本';
     try {
       final info = await PackageInfo.fromPlatform();
       if (!mounted) return;
       _current = '${info.version} (${info.buildNumber})';
+      stage = '获取最新版本';
       final response = await _dio.get(releaseApi);
       final data = Map<String, dynamic>.from(response.data as Map);
       final assets = data['assets'] as List;
       final asset = assets.singleWhere((a) => a['name'] == 'update.json');
-      final manifest = await _dio.get<String>(releaseAssetUrl(asset['browser_download_url']),
-        options: Options(responseType: ResponseType.plain));
-      final release = AppRelease.parse(Map<String, dynamic>.from(jsonDecode(manifest.data!) as Map), data);
+      stage = '读取更新清单';
+      final manifest = await readUpdateManifest(_dio, asset as Map);
+      stage = '校验更新信息';
+      final release = AppRelease.parse(manifest, data);
       if (!mounted) return;
       if (release.code > (int.tryParse(info.buildNumber) ?? 0)) {
         _release = release;
         _status = '发现新版本 ${release.version} (${release.code})';
       } else { _status = '当前已是最新版本'; }
-    } catch (_) {
-      if (mounted) _status = '检查更新失败，请重试或打开发布页';
+    } catch (error) {
+      if (mounted) _status = '$stage失败：${updateFailure(error)}';
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -162,9 +204,19 @@ class _AppUpdatePageState extends State<AppUpdatePage> {
         TextButton(onPressed: () => _cancel?.cancel(), child: const Text('取消下载')),
       TextButton(onPressed: _busy ? null : _check, child: const Text('重新检查')),
       TextButton(onPressed: () async {
-        try { await launchUrl(Uri.parse(releasePage), mode: LaunchMode.externalApplication); }
-        catch (_) { if (mounted) setState(() => _status = '无法打开浏览器，请稍后重试'); }
+        if (!await openProjectUrl(releasePage) && mounted) {
+          setState(() => _status = '无法打开浏览器，可复制仓库地址后手动打开');
+        }
       }, child: const Text('打开发布页')),
+      TextButton(onPressed: () async {
+        if (!await openProjectUrl(repositoryPage) && mounted) {
+          setState(() => _status = '无法打开浏览器，可复制仓库地址后手动打开');
+        }
+      }, child: const Text('打开项目仓库')),
+      TextButton(onPressed: () async {
+        await Clipboard.setData(const ClipboardData(text: repositoryPage));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制仓库地址')));
+      }, child: const Text('复制仓库地址')),
     ]),
   );
 }
