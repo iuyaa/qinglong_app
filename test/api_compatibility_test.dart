@@ -75,7 +75,7 @@ void main() {
     expect(requests.last['auth'], 'Bearer synthetic-token');
     final log = await api.taskLogDetail('a #&中.log', 'folder #&中/sub');
     expect(log.bean, 'first line\n第二行');
-    expect(requests.last['path'], '/api/logs/a #&中.log');
+    expect(requests.last['path'], '/api/logs/a%20%23%26%E4%B8%AD.log');
     expect(requests.last['query']['path'], 'folder #&中/sub');
 
     for (final row in [

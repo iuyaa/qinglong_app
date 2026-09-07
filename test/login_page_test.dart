@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qinglong_app/base/multi_account_userinfo_viewmodel.dart';
+import 'package:qinglong_app/main.dart';
 import 'package:qinglong_app/module/login/login_page.dart';
 import 'package:qinglong_app/utils/sp_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +11,8 @@ void main() {
   testWidgets('Login mode switches fields without mixing credentials', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await SpUtil.getInstance();
+    getIt.registerSingleton<MultiAccountUserInfoViewModel>(MultiAccountUserInfoViewModel());
+    addTearDown(() => getIt.reset());
     await tester.pumpWidget(const ProviderScope(
       child: MaterialApp(home: LoginPage(fromAddNewAccount: true)),
     ));
