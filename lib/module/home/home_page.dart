@@ -42,8 +42,6 @@ class HomePageState extends ConsumerState<HomePage> {
     initTitles();
     super.initState();
     SingleAccountPageState.of(context)?.registerICloud();
-    SingleAccountPageState.of(context)
-        ?.registerHttp(SingleAccountPageState.ofUserInfo(context).host!);
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       if (mounted) getSystemBean(context);
     });

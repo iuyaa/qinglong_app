@@ -39,6 +39,11 @@ class SingleAccountPage extends StatefulWidget {
 
 class SingleAccountPageState extends State<SingleAccountPage> {
   late int index;
+  final _routeClients = <ModalRoute<dynamic>, Http>{};
+  late final NavigatorObserver sessionObserver = _SessionObserver((route) {
+    _routeClients[route] = getIt<Http>(instanceName: index.toString());
+    route.completed.whenComplete(() => _routeClients.remove(route));
+  });
 
   late ChangeNotifierProviderFamily<ConfigViewModel, String?> configProvider;
   late ChangeNotifierProviderFamily<DependencyViewModel, String?> dependencyProvider;
@@ -51,9 +56,10 @@ class SingleAccountPageState extends State<SingleAccountPage> {
 
   @override
   void initState() {
+    super.initState();
     index = widget.index;
     findLoginInfo();
-    super.initState();
+    registerHttp(getIt<UserInfoViewModel>(instanceName: index.toString()).host ?? '');
     registerGlobalKey();
   }
 
@@ -70,10 +76,14 @@ class SingleAccountPageState extends State<SingleAccountPage> {
 
   void resetProviders() {
     final container = ProviderScope.containerOf(context, listen: false);
-    for (final provider in [configProvider, dependencyProvider, envProvider,
-      taskProvider, subscribeProvider, appKeyProvider, homeIndexProvider, codeSearchProvider]) {
-      container.invalidate(provider);
-    }
+    container.invalidate(configProvider);
+    container.invalidate(dependencyProvider);
+    container.invalidate(envProvider);
+    container.invalidate(taskProvider);
+    container.invalidate(subscribeProvider);
+    container.invalidate(appKeyProvider);
+    container.invalidate(homeIndexProvider);
+    container.invalidate(codeSearchProvider);
   }
 
   static StateProviderFamily<String, String?> ofCodeSearchProvider(BuildContext context) {
@@ -121,11 +131,20 @@ class SingleAccountPageState extends State<SingleAccountPage> {
   }
 
   static Http? ofHttp(BuildContext context) {
-    int? index = context.findAncestorStateOfType<SingleAccountPageState>()?.index;
-
-    if (index == null) return null;
-
-    return getIt<Http>(instanceName: index.toString());
+    final owner = of(context);
+    if (owner == null) return null;
+    Http? client;
+    // Non-dependent lookup also works for pages that request data in initState.
+    context.visitAncestorElements((element) {
+      for (final entry in owner._routeClients.entries) {
+        if (identical(element, entry.key.subtreeContext)) {
+          client = entry.value;
+          return false;
+        }
+      }
+      return true;
+    });
+    return client ?? getIt<Http>(instanceName: owner.index.toString());
   }
 
   static Api ofApi(BuildContext context) {
@@ -133,7 +152,7 @@ class SingleAccountPageState extends State<SingleAccountPage> {
 
     if (index == null) return Api(0);
 
-    return Api(index);
+    return Api(index, http: ofHttp(context));
   }
 
   GlobalKey<NavigatorState> navigator = GlobalKey();
@@ -143,6 +162,7 @@ class SingleAccountPageState extends State<SingleAccountPage> {
     return Builder(builder: (context) {
       return Navigator(
         key: navigator,
+        observers: [sessionObserver],
         restorationScopeId: index.toString(),
         onGenerateRoute: (setting) {
           return Routes.generateRoute(setting);
@@ -233,5 +253,21 @@ class SingleAccountPageState extends State<SingleAccountPage> {
       getIt.unregister<ICloudUtils>(instanceName: widget.index.toString());
     }
     getIt.registerSingleton<ICloudUtils>(ICloudUtils(widget.index), instanceName: widget.index.toString());
+  }
+}
+
+// A page keeps its original session through route-removal animations and timers.
+class _SessionObserver extends NavigatorObserver {
+  final void Function(ModalRoute<dynamic>) bind;
+  _SessionObserver(this.bind);
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (route is ModalRoute<dynamic>) bind(route);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    if (newRoute is ModalRoute<dynamic>) bind(newRoute);
   }
 }

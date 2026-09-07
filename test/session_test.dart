@@ -30,6 +30,7 @@ class HarnessState extends SingleAccountPageState {
   @override
   Widget build(BuildContext context) => Navigator(
     key: navigator,
+    observers: [sessionObserver],
     onGenerateRoute: (settings) => MaterialPageRoute(
       settings: settings,
       builder: (context) {
@@ -117,7 +118,6 @@ void main() {
     final key = GlobalKey<SingleAccountPageState>();
     await tester.pumpWidget(ProviderScope(child: MaterialApp(home: SessionHarness(key: key))));
     final owner = key.currentState!;
-    owner.registerHttp(a);
     owner.registerSystemBean('2.21.0', true);
     final user = getIt<UserInfoViewModel>(instanceName: '0');
     final oldHttp = getIt<Http>(instanceName: '0');
@@ -172,6 +172,7 @@ void main() {
     expect(user.host, b);
     expect(user.token, 'synthetic-b');
     expect((await io(() => oldApi.startTasks(['102'])))!.code, -1001);
+    expect((await io(() => SingleAccountPageState.ofApi(panelContext).startTasks(['102'])))!.code, -1001);
     expect(requests.where((r) => r['path'] == '/api/crons/run'), isEmpty);
     await tester.pumpAndSettle();
     expect(find.text('$a:cached-A'), findsNothing);
