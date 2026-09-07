@@ -189,7 +189,7 @@ class _AboutPageState extends ConsumerState<AboutPage> with LazyLoadState<AboutP
                   horizontal: 30,
                 ),
                 child: Text(
-                  "反馈",
+                  "项目链接",
                   style: TextStyle(
                     color: ref.watch(themeProvider).themeColor.descColor(),
                     fontSize: 12,
@@ -355,6 +355,21 @@ class _AboutPageState extends ConsumerState<AboutPage> with LazyLoadState<AboutP
                       indent: 50,
                       height: 1,
                     ),
+                    Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        leading: Icon(CupertinoIcons.paperplane,
+                          color: ref.watch(themeProvider).primaryColor, size: 20),
+                        title: Text('Telegram 频道', style: TextStyle(
+                          color: ref.watch(themeProvider).themeColor.titleColor(), fontSize: 16)),
+                        subtitle: Text('@qinglong_app · 更新公告', style: TextStyle(
+                          color: ref.watch(themeProvider).themeColor.descColor(), fontSize: 12)),
+                        trailing: Icon(CupertinoIcons.right_chevron, size: 16,
+                          color: ref.watch(themeProvider).themeColor.descColor()),
+                        onTap: () => _launchURL('https://t.me/qinglong_app'),
+                      ),
+                    ),
+                    const Divider(indent: 50, height: 1),
                     Material(
                       color: Colors.transparent,
                       child: InkWell(

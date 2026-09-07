@@ -4,6 +4,12 @@
 
 沿用上游的面板登录、多账号切换、任务、日志、环境变量、配置文件、脚本、订阅及依赖管理。已针对青龙 v2.21.0 修复首批接口差异，验证范围见 [接口适配记录](docs/API-002.md)；仍需 Android 真机验收。
 
+## 项目链接
+
+- [项目仓库](https://github.com/iuyaa/qinglong_app)
+- [下载与版本发布](https://github.com/iuyaa/qinglong_app/releases)
+- [Telegram 频道 · 更新公告](https://t.me/qinglong_app)
+
 ## 下载 APK
 
 首次安装：打开 [最新正式版](https://github.com/iuyaa/qinglong_app/releases/latest)，直接下载 `qinglong-android.apk`，无需 GitHub 登录。
@@ -15,7 +21,7 @@
 - 新包名：`io.github.iuyaa.qinglong`，可与原 APK 同时安装，账号配置独立。
 - Android 5.0 及以上是当前构建配置的最低要求；实际手机兼容性待验证。
 - 使用本仓库专用签名，同一签名的后续构建可覆盖升级。
-- 当前版本为 3.0.4，版本代码使用 Actions 构建号。
+- 当前版本以最新正式版为准，版本代码使用 Actions 构建号。
 
 ## 云端构建
 
